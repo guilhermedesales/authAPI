@@ -11,6 +11,7 @@ public class Permissao {
     @GeneratedValue
     private UUID id;
     private String nome;
+    private String descricao;
 
     @ManyToOne
     @JoinColumn(name = "role_id")
@@ -18,8 +19,9 @@ public class Permissao {
 
     public Permissao() {}
 
-    public Permissao(String nome, Role roleId) {
+    public Permissao(String nome, String descricao, Role roleId) {
         this.nome = nome;
+        this.descricao = descricao;
         this.role = roleId;
     }
 
@@ -30,5 +32,8 @@ public class Permissao {
 
     public Role getRole() {return role;}
     public void setRole(Role role) {this.role = role;}
+
+    public String getDescricao() {return descricao;}
+    public void setDescricao(String descricao) {this.descricao = descricao;}
 
 }

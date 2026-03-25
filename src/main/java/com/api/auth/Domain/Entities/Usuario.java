@@ -1,6 +1,8 @@
 package com.api.auth.Domain.Entities;
 
 import jakarta.persistence.Entity;
+import jakarta.persistence.GeneratedValue;
+import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
 
 import java.time.LocalDateTime;
@@ -10,6 +12,7 @@ import java.util.UUID;
 public class Usuario {
 
     @Id
+    @GeneratedValue
     private UUID id;
     private String nome;
     private String email;

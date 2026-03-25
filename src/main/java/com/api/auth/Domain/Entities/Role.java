@@ -2,6 +2,7 @@ package com.api.auth.Domain.Entities;
 
 import jakarta.persistence.*;
 
+import java.util.List;
 import java.util.UUID;
 
 @Entity
@@ -11,16 +12,21 @@ public class Role {
     @GeneratedValue
     private UUID id;
     private String nome;
+    private String descricao;
 
     @ManyToOne
     @JoinColumn(name = "sistema_id")
     private Sistema sistema;
 
+    @OneToMany(mappedBy = "role")
+    private List<Permissao> permissoes;
+
     public Role() {}
 
-    public Role( String nome, Sistema sistema) {
-        this.nome = nome;
+    public Role( Sistema sistema, String nome, String descricao) {
         this.sistema = sistema;
+        this.nome = nome;
+        this.descricao = descricao;
     }
 
     public UUID getId() {return id;}
@@ -30,5 +36,11 @@ public class Role {
 
     public Sistema getSistema() {return sistema;}
     public void setSistema(Sistema sistema) {this.sistema = sistema;}
+
+    public List<Permissao> getPermissoes() {return permissoes;}
+    public void setPermissoes(List<Permissao> permissoes) {this.permissoes = permissoes;}
+
+    public String getDescricao() {return descricao;}
+    public void setDescricao(String descricao) {this.descricao = descricao;}
 
 }

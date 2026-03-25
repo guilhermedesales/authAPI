@@ -1,24 +1,20 @@
 package com.api.auth.Application.DTOs.Sistema;
 
 import com.api.auth.Application.DTOs.Role.RoleDTO;
-import com.api.auth.Application.DTOs.Role.RoleResumoDTO;
-import com.api.auth.Domain.Entities.Role;
 
 import java.util.List;
 import java.util.UUID;
 
-public class SistemaDTO {
+public class SistemaListDTO {
 
     private UUID id;
     private String nome;
     private String descricao;
-    private List<RoleResumoDTO> roles;
 
-    public SistemaDTO(UUID id, String nome,  String descricao,  List<RoleResumoDTO> roles) {
+    public SistemaListDTO(UUID id, String nome, String descricao) {
         this.id = id;
         this.nome = nome;
         this.descricao = descricao;
-        this.roles = roles;
     }
 
     public UUID getId() {return id;}
@@ -28,8 +24,5 @@ public class SistemaDTO {
 
     public String getDescricao() {return descricao;}
     public void setDescricao(String descricao) {this.descricao = descricao;}
-
-    public List<RoleResumoDTO> getRoles() {return roles;}
-    public void setRoles(List<RoleResumoDTO> roles) {this.roles = roles;}
 
 }
