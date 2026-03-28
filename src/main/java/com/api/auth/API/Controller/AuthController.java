@@ -1,6 +1,9 @@
 package com.api.auth.API.Controller;
 
+import com.api.auth.Application.DTOs.Auth.LoginDTO;
+import com.api.auth.Application.DTOs.Auth.RegistrarDTO;
 import com.api.auth.Application.DTOs.Usuario.CriarUsuarioDTO;
+import com.api.auth.Application.Service.AuthService;
 import com.api.auth.Application.Service.UsuarioService;
 import com.api.auth.Domain.Entities.Usuario;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -14,14 +17,21 @@ import org.springframework.web.bind.annotation.RestController;
 public class AuthController {
 
     private final UsuarioService usuarioService;
+    private final AuthService authService;
 
-    public AuthController(UsuarioService usuarioService){
+    public AuthController(UsuarioService usuarioService, AuthService authService){
         this.usuarioService = usuarioService;
+        this.authService = authService;
     }
 
     @PostMapping("/register")
-    public Usuario criar(CriarUsuarioDTO dto) {
-        return usuarioService.criar(dto);
+    public Usuario registrar(RegistrarDTO dto) {
+        return authService.registrar(dto);
+    }
+
+    @PostMapping("login")
+    public String login(LoginDTO dto) {
+        return authService.login(dto);
     }
 
 }
