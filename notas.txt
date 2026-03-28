@@ -1,1 +1,3 @@
 - criar um dto de retorno de user
+
+- adicionar sistema nome e role nome no response de usuarioSistema

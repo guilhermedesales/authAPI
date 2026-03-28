@@ -4,6 +4,7 @@ import jakarta.persistence.*;
 
 import java.util.UUID;
 
+@Table(uniqueConstraints = @UniqueConstraint(columnNames = {"usuario_id", "sistema_id"}))
 @Entity
 public class UsuarioSistema {
 

@@ -15,4 +15,6 @@ public interface RoleRepository extends JpaRepository<Role, UUID> {
 
     @Query("SELECT r FROM Role r LEFT JOIN FETCH r.permissoes WHERE r.id = :id")
     Optional<Role> findByIdWithRoles(UUID id);
+
+    Optional<Role> findByIdAndSistemaId(UUID usuarioId, UUID sistemaId);
 }
