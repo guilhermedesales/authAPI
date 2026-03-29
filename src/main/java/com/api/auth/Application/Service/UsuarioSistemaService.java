@@ -52,7 +52,11 @@ public class UsuarioSistemaService {
         if (existe)
             throw new RuntimeException("Usuario já vinculado a este sistema");
 
-        UsuarioSistema usuarioSistema = new UsuarioSistema(sistema, usuario, role);
+        UsuarioSistema usuarioSistema = UsuarioSistema.builder()
+                .sistema(sistema)
+                .usuario(usuario)
+                .role(role)
+                .build();
 
         UsuarioSistema saved = usuarioSistemaRepository.save(usuarioSistema);
         return mappingProfile.toDTO(saved);
@@ -78,4 +82,31 @@ public class UsuarioSistemaService {
 
     }
 
+    public UsuarioSistemaDTO buscarPorId(UUID id){
+        UsuarioSistema usuarioSistema = usuarioSistemaRepository.findById(id).orElse(null);
+        return mappingProfile.toDTO(usuarioSistema);
+    }
+
+    public UsuarioSistemaDTO mudarRoleUser(UUID usuarioSistemaId, UUID novaRoleId) {
+
+        UsuarioSistema usuarioSistema = usuarioSistemaRepository.findById(usuarioSistemaId)
+                .orElseThrow(() -> new RuntimeException("Vínculo não encontrado"));
+
+        Role novaRole = roleRepository
+                .findByIdAndSistemaId(novaRoleId, usuarioSistema.getSistema().getId())
+                .orElseThrow(() -> new RuntimeException("Role não encontrada para este sistema"));
+
+        usuarioSistema.setRole(novaRole);
+        UsuarioSistema updated = usuarioSistemaRepository.save(usuarioSistema);
+
+        return mappingProfile.toDTO(updated);
+    }
+
+    public void remover(UUID usuarioSistemaId) {
+
+        UsuarioSistema usuarioSistema = usuarioSistemaRepository.findById(usuarioSistemaId)
+                .orElseThrow(() -> new RuntimeException("Vínculo não encontrado"));
+
+        usuarioSistemaRepository.delete(usuarioSistema);
+    }
 }

@@ -1,14 +1,15 @@
 package com.api.auth.Application.DTOs.Sistema;
 
+import lombok.AllArgsConstructor;
+import lombok.Getter;
+import lombok.NoArgsConstructor;
+import lombok.Setter;
+
+@Getter
+@AllArgsConstructor
 public class CriarSistemaDTO {
 
     private String nome;
     private String descricao;
-
-    public String getNome() {return nome;}
-    public void setNome(String nome) {this.nome = nome;}
-
-    public String getDescricao() {return descricao;}
-    public void setDescricao(String descricao) {this.descricao = descricao;}
 
 }

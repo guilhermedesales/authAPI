@@ -17,10 +17,9 @@ import java.util.UUID;
 public interface UsuarioSistemaRepository extends JpaRepository<UsuarioSistema, UUID> {
     Optional<UsuarioSistema> findByUsuarioAndSistema(Usuario usuario, Sistema sistema);
 
-    Page <UsuarioSistema> findByUsuarioId(UUID usuarioId, Pageable pageable);
+    Page<UsuarioSistema> findByUsuarioId(UUID usuarioId, Pageable pageable);
     Page<UsuarioSistema> findBySistemaId(UUID sistemaId, Pageable pageable);
     Page<UsuarioSistema> findByUsuarioIdAndSistemaId(UUID usuarioId, UUID sistemaId,  Pageable pageable);
 
     boolean existsByUsuarioIdAndSistemaId(UUID usuarioId, UUID sistemaId);
-
 }

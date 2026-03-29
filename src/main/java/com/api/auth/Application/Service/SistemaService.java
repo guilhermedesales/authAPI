@@ -27,7 +27,10 @@ public class SistemaService {
 
     public SistemaListDTO criar(CriarSistemaDTO dto){
 
-        Sistema sistema = new Sistema(dto.getNome(), dto.getDescricao());
+        Sistema sistema = Sistema.builder()
+                .nome(dto.getNome())
+                .descricao(dto.getDescricao())
+                .build();
         Sistema saved = sistemaRepository.save(sistema);
         return mappingProfile.toListDTO(saved);
     }
@@ -42,7 +45,8 @@ public class SistemaService {
     }
 
     public SistemaDTO buscarPorId(UUID id) {
-        Sistema sistema =  sistemaRepository.findByIdWithRoles(id).orElse(null);
+        Sistema sistema = sistemaRepository.findByIdWithRoles(id)
+                .orElseThrow(() -> new RuntimeException("Sistema não encontrado"));
         return mappingProfile.toDTO(sistema);
     }
 }

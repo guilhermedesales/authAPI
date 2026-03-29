@@ -32,7 +32,12 @@ public class RoleService {
         Sistema sistema = sistemaRepository.findById(dto.getSistemaId())
                 .orElseThrow(() -> new RuntimeException("Sistema não encontrado"));
 
-        Role role = new Role(sistema, dto.getNome(), dto.getDescricao());
+        Role role = Role.builder()
+                .sistema(sistema)
+                .nome(dto.getNome())
+                .descricao(dto.getDescricao())
+                .build();
+
         Role saved = roleRepository.save(role);
         return mappingProfile.toListDTO(saved);
     }

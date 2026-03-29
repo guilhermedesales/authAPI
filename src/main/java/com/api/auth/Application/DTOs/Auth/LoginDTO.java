@@ -1,20 +1,18 @@
 package com.api.auth.Application.DTOs.Auth;
 
+import lombok.AllArgsConstructor;
+import lombok.Getter;
+import lombok.NoArgsConstructor;
+import lombok.Setter;
+
 import java.util.UUID;
 
+@Getter
+@AllArgsConstructor
 public class LoginDTO {
 
     private String email;
     private String senha;
     private UUID sistemaId;
-
-    public String getEmail() {return email;}
-    public void setEmail(String email) {this.email = email;}
-
-    public String getSenha() {return senha;}
-    public void setSenha(String senha) {this.senha = senha;}
-
-    public UUID getSistemaId() {return sistemaId;}
-    public void setSistemaId(UUID sistemaId) {this.sistemaId = sistemaId;}
 
 }

@@ -32,7 +32,11 @@ public class PermissaoService {
         Role role = roleRepository.findById(dto.getRoleId())
                 .orElseThrow(() -> new RuntimeException("Role não encontrado"));
 
-        Permissao permissao = new Permissao(dto.getNome(), dto.getDescricao(), role);
+        Permissao permissao = Permissao.builder()
+                .nome(dto.getNome())
+                .descricao(dto.getDescricao())
+                .build();
+
         Permissao saved = permissaoRepository.save(permissao);
         return mappingProfile.toDTO(saved);
     }

@@ -1,12 +1,19 @@
 package com.api.auth.Domain.Entities;
 
 import jakarta.persistence.*;
+import lombok.*;
 
+import java.time.LocalDateTime;
 import java.util.UUID;
 
-@Table(uniqueConstraints = @UniqueConstraint(columnNames = {"usuario_id", "sistema_id"}))
+@Getter
+@Setter
+@NoArgsConstructor
 @Entity
-public class UsuarioSistema {
+@Builder
+@AllArgsConstructor(access = AccessLevel.PRIVATE)
+@Table(uniqueConstraints = @UniqueConstraint(columnNames = {"usuario_id", "sistema_id"}))
+public class UsuarioSistema extends BaseEntity {
 
     @Id
     @GeneratedValue
@@ -23,40 +30,4 @@ public class UsuarioSistema {
     @ManyToOne
     @JoinColumn(name = "role_id")
     private Role role;
-
-    public UsuarioSistema() {}
-
-    public UsuarioSistema(Sistema sistema, Usuario usuario, Role role) {
-        this.sistema = sistema;
-        this.usuario = usuario;
-        this.role = role;
-    }
-
-    public UUID getId() {
-        return id;
-    }
-
-    public Usuario getUsuario() {
-        return usuario;
-    }
-
-    public void setUsuario(Usuario usuario) {
-        this.usuario = usuario;
-    }
-
-    public Sistema getSistema() {
-        return sistema;
-    }
-
-    public void setSistema(Sistema sistema) {
-        this.sistema = sistema;
-    }
-
-    public Role getRole() {
-        return role;
-    }
-
-    public void setRole(Role role) {
-        this.role = role;
-    }
 }

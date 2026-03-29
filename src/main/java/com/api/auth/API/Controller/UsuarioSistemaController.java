@@ -36,4 +36,22 @@ public class UsuarioSistemaController {
     ) {
         return usuarioSistemaService.listar(usuarioId, sistemaId, page, size);
     }
+
+    @GetMapping("/{id}")
+    public UsuarioSistemaDTO  buscarPorId(@PathVariable UUID id) {
+        return usuarioSistemaService.buscarPorId(id);
+    }
+
+    @PatchMapping("/{id}/role")
+    public UsuarioSistemaDTO mudarRole(
+            @PathVariable UUID id,
+            @RequestParam UUID roleId
+    ) {
+        return usuarioSistemaService.mudarRoleUser(id, roleId);
+    }
+
+    @DeleteMapping("/{id}")
+    public void deletar(@PathVariable UUID id) {
+        usuarioSistemaService.remover(id);
+    }
 }
