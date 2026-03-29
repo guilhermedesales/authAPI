@@ -3,6 +3,9 @@ package com.api.auth.Application.Service;
 import com.api.auth.Application.DTOs.Auth.LoginDTO;
 import com.api.auth.Application.DTOs.Auth.RegistrarDTO;
 import com.api.auth.Application.DTOs.Usuario.CriarUsuarioDTO;
+import com.api.auth.Application.Exceptions.NotFoundException;
+import com.api.auth.Application.Exceptions.ValidationException;
+import com.api.auth.Application.Utils.ErrorMessages;
 import com.api.auth.Domain.Entities.Sistema;
 import com.api.auth.Domain.Entities.Usuario;
 import com.api.auth.Domain.Entities.UsuarioSistema;
@@ -10,9 +13,13 @@ import com.api.auth.Infra.Repositories.SistemaRepository;
 import com.api.auth.Infra.Repositories.UsuarioRepository;
 import com.api.auth.Infra.Repositories.UsuarioSistemaRepository;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.web.error.Error;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
+
+import java.util.ArrayList;
+import java.util.List;
 
 @Service
 public class AuthService {
@@ -34,6 +41,10 @@ public class AuthService {
 
     public Usuario registrar(RegistrarDTO dto) {
 
+        validarSenha(dto.getSenha());
+        if (usuarioRepository.existsByEmail(dto.getEmail()))
+            throw new ValidationException(ErrorMessages.Auth.EMAIL_JA_CADASTRADO);
+
         Usuario usuario = new Usuario();
 
         usuario.setNome(dto.getNome());
@@ -45,18 +56,43 @@ public class AuthService {
 
     public String login(LoginDTO dto){
         Sistema sistema = sistemaRepository.findById(dto.getSistemaId())
-                .orElseThrow(() -> new RuntimeException("Sistema não encontrado"));
+                .orElseThrow(() -> new NotFoundException(ErrorMessages.Recursos.SISTEMA_NAO_ENCONTRADO));
 
         Usuario usuario = usuarioRepository.findByEmail(dto.getEmail())
-                .orElseThrow(() -> new RuntimeException("Usuário não encontrado"));
+                .orElseThrow(() -> new NotFoundException(ErrorMessages.Recursos.USUARIO_NAO_ENCONTRADO));
 
         UsuarioSistema usuarioSistema = usuarioSistemaRepository.findByUsuarioAndSistema(usuario, sistema)
-                .orElseThrow(() -> new RuntimeException("Usuário não encontrado para esse sistema"));
+                .orElseThrow(() -> new NotFoundException(ErrorMessages.Recursos.USUARIO_NAO_ENCONTRADO_SISTEMA));
 
         if(!encoder.matches(dto.getSenha(), usuario.getSenha()))
-            throw new RuntimeException("Senha inválida");
+            throw new NotFoundException(ErrorMessages.Auth.CREDENCIAIS_INVALIDAS);
 
         return jwtService.generateToken(usuarioSistema);
+    }
+
+
+    /////// utilitários
+
+    private void validarSenha(String senha){
+        List<String> erros = new ArrayList<>();
+
+        if (senha.length() < 8)
+            erros.add(ErrorMessages.Senha.MINIMO_CARACTERES);
+
+        if (!senha.matches(".*[A-Z].*"))
+            erros.add(ErrorMessages.Senha.LETRA_MAIUSCULA);
+
+        if (!senha.matches(".*[a-z].*"))
+            erros.add(ErrorMessages.Senha.LETRA_MINUSCULA);
+
+        if (!senha.matches(".*\\d.*"))
+            erros.add(ErrorMessages.Senha.NUMERO);
+
+        if (!senha.matches(".*[@$!%*?&].*"))
+            erros.add(ErrorMessages.Senha.CARACTERE_ESPECIAL);
+
+        if (!erros.isEmpty())
+            throw new ValidationException(erros);
     }
 
 }

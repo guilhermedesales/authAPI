@@ -7,7 +7,9 @@ import com.api.auth.Application.Service.AuthService;
 import com.api.auth.Application.Service.UsuarioService;
 import com.api.auth.Domain.Entities.Usuario;
 import io.swagger.v3.oas.annotations.tags.Tag;
+import jakarta.validation.Valid;
 import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
@@ -25,12 +27,12 @@ public class AuthController {
     }
 
     @PostMapping("/register")
-    public Usuario registrar(RegistrarDTO dto) {
+    public Usuario registrar(@Valid @RequestBody RegistrarDTO dto) {
         return authService.registrar(dto);
     }
 
     @PostMapping("login")
-    public String login(LoginDTO dto) {
+    public String login(@Valid @RequestBody LoginDTO dto) {
         return authService.login(dto);
     }
 

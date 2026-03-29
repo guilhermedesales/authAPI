@@ -1,3 +1,18 @@
 - criar um dto de retorno de user
 
-- adicionar sistema nome e role nome no response de usuarioSistema
+- adicionar refresh token
+
+- adicionar validação do email com cod enviado para o email registrado
+
+- adicionar block de user com muitas tentativas de login
+
+- adicionar mudar senha
+
+- adicionar mensagens de erro padronizadas / adicionar exceptions e middlewares (ainda tem q melhorar)
+
+- senha tem q seguir um padrão (1 letra maiuscula, 1 letra minuscula 1 caracter especial, 1 numero, min de 8 letras/num)
+
+- email tem q ser unique
+
+- não permitir mudar senha para uma senha ja usada antes (lista de 3 - 5)
+

@@ -4,7 +4,9 @@ import com.api.auth.Application.DTOs.Permissao.PermissaoDTO;
 import com.api.auth.Application.DTOs.Sistema.CriarSistemaDTO;
 import com.api.auth.Application.DTOs.Sistema.SistemaDTO;
 import com.api.auth.Application.DTOs.Sistema.SistemaListDTO;
+import com.api.auth.Application.Exceptions.NotFoundException;
 import com.api.auth.Application.Mapper.MappingProfile;
+import com.api.auth.Application.Utils.ErrorMessages;
 import com.api.auth.Infra.Repositories.SistemaRepository;
 import com.api.auth.Domain.Entities.Sistema;
 import org.springframework.stereotype.Service;
@@ -46,7 +48,7 @@ public class SistemaService {
 
     public SistemaDTO buscarPorId(UUID id) {
         Sistema sistema = sistemaRepository.findByIdWithRoles(id)
-                .orElseThrow(() -> new RuntimeException("Sistema não encontrado"));
+                .orElseThrow(() -> new NotFoundException(ErrorMessages.Recursos.SISTEMA_NAO_ENCONTRADO));
         return mappingProfile.toDTO(sistema);
     }
 }
