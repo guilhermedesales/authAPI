@@ -1,12 +1,19 @@
 package com.api.auth.Domain.Entities;
 
 import jakarta.persistence.*;
+import lombok.*;
 
+import java.time.LocalDateTime;
 import java.util.List;
 import java.util.UUID;
 
+@Getter
+@Setter
+@NoArgsConstructor
 @Entity
-public class Role {
+@Builder
+@AllArgsConstructor(access = AccessLevel.PRIVATE)
+public class Role extends BaseEntity {
 
     @Id
     @GeneratedValue
@@ -20,27 +27,4 @@ public class Role {
 
     @OneToMany(mappedBy = "role")
     private List<Permissao> permissoes;
-
-    public Role() {}
-
-    public Role( Sistema sistema, String nome, String descricao) {
-        this.sistema = sistema;
-        this.nome = nome;
-        this.descricao = descricao;
-    }
-
-    public UUID getId() {return id;}
-
-    public String getNome() {return nome;}
-    public void setNome(String nome) {this.nome = nome;}
-
-    public Sistema getSistema() {return sistema;}
-    public void setSistema(Sistema sistema) {this.sistema = sistema;}
-
-    public List<Permissao> getPermissoes() {return permissoes;}
-    public void setPermissoes(List<Permissao> permissoes) {this.permissoes = permissoes;}
-
-    public String getDescricao() {return descricao;}
-    public void setDescricao(String descricao) {this.descricao = descricao;}
-
 }

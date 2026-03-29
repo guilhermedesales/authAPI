@@ -1,15 +1,19 @@
 package com.api.auth.Domain.Entities;
 
-import jakarta.persistence.Entity;
-import jakarta.persistence.GeneratedValue;
-import jakarta.persistence.Id;
-import jakarta.persistence.OneToMany;
+import jakarta.persistence.*;
+import lombok.*;
 
+import java.time.LocalDateTime;
 import java.util.List;
 import java.util.UUID;
 
+@Getter
+@Setter
+@NoArgsConstructor
 @Entity
-public class Sistema {
+@Builder
+@AllArgsConstructor(access = AccessLevel.PRIVATE)
+public class Sistema extends BaseEntity {
 
     @Id
     @GeneratedValue
@@ -19,22 +23,4 @@ public class Sistema {
 
     @OneToMany(mappedBy = "sistema")
     private List<Role> roles;
-
-    public Sistema() {}
-
-    public Sistema(String nome, String desc) {
-        this.nome = nome;
-        this.descricao = desc;
-    }
-
-    public UUID getId() {return id;}
-
-    public String getNome() {return nome;}
-    public void setNome(String nome) {this.nome = nome;}
-
-    public String getDescricao() {return descricao;}
-    public void setDescricao(String descricao) {this.descricao = descricao;}
-
-    public List<Role> getRoles() {return roles;}
-    public void setRoles(List<Role> roles) {this.roles = roles;}
 }

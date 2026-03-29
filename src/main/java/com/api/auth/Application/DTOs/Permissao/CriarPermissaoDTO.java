@@ -1,19 +1,18 @@
 package com.api.auth.Application.DTOs.Permissao;
 
+import lombok.AllArgsConstructor;
+import lombok.Getter;
+import lombok.NoArgsConstructor;
+import lombok.Setter;
+
 import java.util.UUID;
 
+@Getter
+@AllArgsConstructor
 public class CriarPermissaoDTO {
 
     private  String nome;
     private  String descricao;
     private UUID roleId;
 
-    public String getNome() {return nome;}
-    public void setNome(String nome) {this.nome = nome;}
-
-    public UUID getRoleId() {return roleId;}
-    public void setRoleId(UUID roleId) {this.roleId = roleId;}
-
-    public String getDescricao() {return descricao;}
-    public void setDescricao(String descricao) {this.descricao = descricao;}
 }

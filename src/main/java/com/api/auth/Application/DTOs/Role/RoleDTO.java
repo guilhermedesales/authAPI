@@ -1,12 +1,17 @@
 package com.api.auth.Application.DTOs.Role;
 
-import com.api.auth.Application.DTOs.Permissao.PermissaoDTO;
 import com.api.auth.Application.DTOs.Permissao.PermissaoResumoDTO;
-import com.api.auth.Domain.Entities.Permissao;
+import lombok.AllArgsConstructor;
+import lombok.Getter;
+import lombok.NoArgsConstructor;
+import lombok.Setter;
 
+import java.time.LocalDateTime;
 import java.util.List;
 import java.util.UUID;
 
+@Getter
+@AllArgsConstructor
 public class RoleDTO {
 
     private UUID id;
@@ -18,30 +23,6 @@ public class RoleDTO {
 
     private List<PermissaoResumoDTO> permissoes;
 
-    public RoleDTO(UUID id, String nome, String descricao, UUID sistemaId, String sistemaNome, List<PermissaoResumoDTO> permissoes) {
-        this.id = id;
-        this.nome = nome;
-        this.descricao = descricao;
-        this.sistemaId = sistemaId;
-        this.sistemaNome = sistemaNome;
-        this.permissoes = permissoes;
-    }
-
-    public UUID getId() {return id;}
-
-    public String getNome() {return nome;}
-    public void setNome(String nome) {this.nome = nome;}
-
-    public UUID getSistemaId() {return sistemaId;}
-    public void setSistemaId(UUID sistemaId) {this.sistemaId = sistemaId;}
-
-    public String getSistemaNome() {return sistemaNome;}
-    public void setSistemaNome(String sistemaNome) {this.sistemaNome = sistemaNome;}
-
-    public List<PermissaoResumoDTO> getPermissoes() {return permissoes;}
-    public void setPermissoes (List<PermissaoResumoDTO> permissoes) {this.permissoes = permissoes;}
-
-    public String getDescricao() {return descricao;}
-    public void setDescricao(String descricao) {this.descricao = descricao;}
-
+    private LocalDateTime createdAt;
+    private LocalDateTime updatedAt;
 }
