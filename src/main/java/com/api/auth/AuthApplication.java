@@ -12,6 +12,7 @@ public class AuthApplication {
         Dotenv dotenv = Dotenv.load(); // carrega .env
         System.setProperty("JWT_SECRET", dotenv.get("JWT_SECRET"));
         System.setProperty("JWT_EXPIRATION", dotenv.get("JWT_EXPIRATION"));
+        System.setProperty("JWT_REFRESH_EXPIRATION", dotenv.get("JWT_REFRESH_EXPIRATION"));
 
 		SpringApplication.run(AuthApplication.class, args);
 	}

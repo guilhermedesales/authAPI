@@ -25,6 +25,7 @@ public final class ErrorMessages {
         public static final String ROLE_NAO_ENCONTRADA_SISTEMA = "Role não encontrada para este sistema.";
         public static final String ROLE_NAO_ENCONTRADA = "Role não encontrada";
         public static final String PERMISSAO_NAO_ENCONTRADO = "Permissão não encontrada.";
+        public static final String REFRESH_TOKEN_NAO_ENCONTRADO = "Refresh token não encontrado. Faça login novamente.";
     }
 
     public static class Sistema {

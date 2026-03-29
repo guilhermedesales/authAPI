@@ -1,5 +1,6 @@
 package com.api.auth.Application.Mapper;
 
+import com.api.auth.Application.DTOs.Auth.Registrar.RegistrarResponseDTO;
 import com.api.auth.Application.DTOs.Permissao.PermissaoDTO;
 import com.api.auth.Application.DTOs.Permissao.PermissaoResumoDTO;
 import com.api.auth.Application.DTOs.Role.RoleDTO;
@@ -9,10 +10,7 @@ import com.api.auth.Application.DTOs.Sistema.SistemaDTO;
 import com.api.auth.Application.DTOs.Sistema.SistemaListDTO;
 import com.api.auth.Application.DTOs.UsuarioSistema.CriarUsuarioSistemaDTO;
 import com.api.auth.Application.DTOs.UsuarioSistema.UsuarioSistemaDTO;
-import com.api.auth.Domain.Entities.Permissao;
-import com.api.auth.Domain.Entities.Role;
-import com.api.auth.Domain.Entities.Sistema;
-import com.api.auth.Domain.Entities.UsuarioSistema;
+import com.api.auth.Domain.Entities.*;
 import org.mapstruct.Mapper;
 import org.mapstruct.Mapping;
 
@@ -67,4 +65,8 @@ public interface MappingProfile {
     @Mapping(source = "createdAt", target = "createdAt")
     @Mapping(source = "updatedAt", target = "updatedAt")
     UsuarioSistemaDTO toDTO(UsuarioSistema usuarioSistema);
+
+    /////////// USUARIO //////////
+
+    RegistrarResponseDTO toDTO(Usuario usuario);
 }

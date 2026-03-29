@@ -18,6 +18,7 @@ public class Usuario extends BaseEntity {
     @GeneratedValue
     private UUID id;
     private String nome;
+    @Column(unique = true)
     private String email;
     private String senha;
     private boolean ativo;

@@ -1,20 +1,22 @@
 package com.api.auth.Application.Service;
 
-import com.api.auth.Application.DTOs.Auth.LoginDTO;
-import com.api.auth.Application.DTOs.Auth.RegistrarDTO;
-import com.api.auth.Application.DTOs.Usuario.CriarUsuarioDTO;
+import com.api.auth.Application.DTOs.Auth.Login.LoginDTO;
+import com.api.auth.Application.DTOs.Auth.Login.LoginResponseDTO;
+import com.api.auth.Application.DTOs.Auth.Registrar.RegistrarDTO;
+import com.api.auth.Application.DTOs.Auth.Registrar.RegistrarResponseDTO;
 import com.api.auth.Application.Exceptions.NotFoundException;
 import com.api.auth.Application.Exceptions.ValidationException;
+import com.api.auth.Application.Mapper.MappingProfile;
 import com.api.auth.Application.Utils.ErrorMessages;
 import com.api.auth.Domain.Entities.Sistema;
 import com.api.auth.Domain.Entities.Usuario;
+import com.api.auth.Domain.Entities.RefreshToken;
 import com.api.auth.Domain.Entities.UsuarioSistema;
 import com.api.auth.Infra.Repositories.SistemaRepository;
 import com.api.auth.Infra.Repositories.UsuarioRepository;
 import com.api.auth.Infra.Repositories.UsuarioSistemaRepository;
+import jakarta.transaction.Transactional;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.web.error.Error;
-import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 
@@ -29,17 +31,19 @@ public class AuthService {
     private final PasswordEncoder encoder;
     private final JwtService jwtService;
     private final SistemaRepository sistemaRepository;
+    private final MappingProfile mappingProfile;
 
     @Autowired
-    public AuthService(UsuarioRepository usuarioRepository, JwtService jwtService, PasswordEncoder encoder, SistemaRepository sistemaRepository, UsuarioSistemaRepository usuarioSistemaRepository) {
+    public AuthService(UsuarioRepository usuarioRepository, JwtService jwtService, PasswordEncoder encoder, SistemaRepository sistemaRepository, UsuarioSistemaRepository usuarioSistemaRepository, MappingProfile mappingProfile) {
         this.usuarioRepository = usuarioRepository;
         this.jwtService = jwtService;
         this.sistemaRepository = sistemaRepository;
         this.usuarioSistemaRepository = usuarioSistemaRepository;
         this.encoder = encoder;
+        this.mappingProfile = mappingProfile;
     }
 
-    public Usuario registrar(RegistrarDTO dto) {
+    public RegistrarResponseDTO registrar(RegistrarDTO dto) {
 
         validarSenha(dto.getSenha());
         if (usuarioRepository.existsByEmail(dto.getEmail()))
@@ -51,10 +55,13 @@ public class AuthService {
         usuario.setEmail(dto.getEmail());
         usuario.setSenha(encoder.encode(dto.getSenha()));
 
-        return usuarioRepository.save(usuario);
+        Usuario saved = usuarioRepository.save(usuario);
+
+        return mappingProfile.toDTO(saved);
     }
 
-    public String login(LoginDTO dto){
+    @Transactional
+    public LoginResponseDTO login(LoginDTO dto){
         Sistema sistema = sistemaRepository.findById(dto.getSistemaId())
                 .orElseThrow(() -> new NotFoundException(ErrorMessages.Recursos.SISTEMA_NAO_ENCONTRADO));
 
@@ -67,11 +74,17 @@ public class AuthService {
         if(!encoder.matches(dto.getSenha(), usuario.getSenha()))
             throw new NotFoundException(ErrorMessages.Auth.CREDENCIAIS_INVALIDAS);
 
-        return jwtService.generateToken(usuarioSistema);
+        // gera o access token com todas as claims
+        String token = jwtService.generateToken(usuarioSistema);
+
+        // cria o refresh token e salva no banco
+        RefreshToken refreshToken = jwtService.createRefreshToken(usuario);
+
+        // retorna ambos
+        return new LoginResponseDTO(token, refreshToken.getToken());
     }
 
-
-    /////// utilitários
+    /////// utilitários /////////
 
     private void validarSenha(String senha){
         List<String> erros = new ArrayList<>();

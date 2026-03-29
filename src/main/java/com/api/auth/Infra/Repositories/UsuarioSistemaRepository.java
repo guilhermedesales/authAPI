@@ -22,4 +22,6 @@ public interface UsuarioSistemaRepository extends JpaRepository<UsuarioSistema, 
     Page<UsuarioSistema> findByUsuarioIdAndSistemaId(UUID usuarioId, UUID sistemaId,  Pageable pageable);
 
     boolean existsByUsuarioIdAndSistemaId(UUID usuarioId, UUID sistemaId);
+
+    Optional<UsuarioSistema> findByUsuario(Usuario usuario);
 }
