@@ -32,4 +32,10 @@ public final class ErrorMessages {
         public static final String ERRO_INTERNO = "Ocorreu um erro ao processar sua solicitação. Tente novamente.";
     }
 
+    public static class CodigoEmail{
+        public static final String CODIGO_INVALIDO = "Código Inválido";
+        public static final String CODIGO_UTILIZADO = "Código já utilizado.";
+        public static final String CODIGO_EXPIRADO = "Código expirado.";
+    }
+
 }

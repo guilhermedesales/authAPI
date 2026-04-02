@@ -1,0 +1,36 @@
+package com.api.auth.Domain.Entities;
+
+import com.api.auth.Domain.Enum.TipoVerificacao;
+import jakarta.persistence.*;
+import lombok.*;
+
+import java.time.Instant;
+import java.util.UUID;
+
+@Entity
+@Getter @Setter
+@NoArgsConstructor @AllArgsConstructor
+public class VerificationCode {
+
+    @Id
+    @GeneratedValue
+    private UUID id;
+
+    @Column(nullable = false)
+    private String code;
+
+    @OneToOne
+    @JoinColumn(name = "usuario_id")
+    private Usuario usuario;
+
+    @Column(nullable = false)
+    private Instant expiryDate;
+
+    @Column(nullable = false)
+    private boolean used = false;
+
+    @Enumerated(EnumType.STRING)
+    private TipoVerificacao tipo; // LOGIN, ALTERAR_SENHA, etc
+
+    private String novaSenhaHash; // usado apenas no fluxo de alterar senha
+}

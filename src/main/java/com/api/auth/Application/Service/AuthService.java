@@ -1,5 +1,6 @@
 package com.api.auth.Application.Service;
 
+import com.api.auth.Application.DTOs.Auth.AlterarSenhaDTO;
 import com.api.auth.Application.DTOs.Auth.Login.LoginDTO;
 import com.api.auth.Application.DTOs.Auth.Login.LoginResponseDTO;
 import com.api.auth.Application.DTOs.Auth.Registrar.RegistrarDTO;
@@ -8,21 +9,25 @@ import com.api.auth.Application.Exceptions.NotFoundException;
 import com.api.auth.Application.Exceptions.ValidationException;
 import com.api.auth.Application.Mapper.MappingProfile;
 import com.api.auth.Application.Utils.ErrorMessages;
-import com.api.auth.Domain.Entities.Sistema;
-import com.api.auth.Domain.Entities.Usuario;
-import com.api.auth.Domain.Entities.RefreshToken;
-import com.api.auth.Domain.Entities.UsuarioSistema;
+import com.api.auth.Application.Utils.LogSanitizer;
+import com.api.auth.Domain.Entities.*;
+import com.api.auth.Domain.Enum.TipoVerificacao;
 import com.api.auth.Infra.Repositories.SistemaRepository;
 import com.api.auth.Infra.Repositories.UsuarioRepository;
 import com.api.auth.Infra.Repositories.UsuarioSistemaRepository;
 import jakarta.transaction.Transactional;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.UUID;
 
+@Slf4j
 @Service
 public class AuthService {
 
@@ -32,36 +37,46 @@ public class AuthService {
     private final JwtService jwtService;
     private final SistemaRepository sistemaRepository;
     private final MappingProfile mappingProfile;
+    private final VerificationCodeService verificationCodeService;
+    private final SenhaHistoricoService senhaHistoricoService;
 
     @Autowired
-    public AuthService(UsuarioRepository usuarioRepository, JwtService jwtService, PasswordEncoder encoder, SistemaRepository sistemaRepository, UsuarioSistemaRepository usuarioSistemaRepository, MappingProfile mappingProfile) {
+    public AuthService(UsuarioRepository usuarioRepository, JwtService jwtService, PasswordEncoder encoder, SistemaRepository sistemaRepository, UsuarioSistemaRepository usuarioSistemaRepository, MappingProfile mappingProfile, VerificationCodeService verificationCodeService, SenhaHistoricoService senhaHistoricoService) {
         this.usuarioRepository = usuarioRepository;
         this.jwtService = jwtService;
         this.sistemaRepository = sistemaRepository;
         this.usuarioSistemaRepository = usuarioSistemaRepository;
         this.encoder = encoder;
         this.mappingProfile = mappingProfile;
+        this.verificationCodeService = verificationCodeService;
+        this.senhaHistoricoService = senhaHistoricoService;
     }
 
     public RegistrarResponseDTO registrar(RegistrarDTO dto) {
+        String maskedEmail = LogSanitizer.maskEmail(dto.getEmail());
+        log.info("[AUTH] Register attempt - email={}", maskedEmail);
 
         validarSenha(dto.getSenha());
-        if (usuarioRepository.existsByEmail(dto.getEmail()))
+        if (usuarioRepository.existsByEmail(dto.getEmail())) {
+            log.warn("[AUTH] Register failed - reason=email_already_registered email={}", maskedEmail);
             throw new ValidationException(ErrorMessages.Auth.EMAIL_JA_CADASTRADO);
+        }
 
-        Usuario usuario = new Usuario();
-
-        usuario.setNome(dto.getNome());
-        usuario.setEmail(dto.getEmail());
-        usuario.setSenha(encoder.encode(dto.getSenha()));
+        Usuario usuario = Usuario.builder()
+                .email(dto.getEmail())
+                .nome(dto.getNome())
+                .senha(encoder.encode(dto.getSenha()))
+                .build();
 
         Usuario saved = usuarioRepository.save(usuario);
-
+        log.info("[AUTH] Register success - userId={} email={}", saved.getId(), maskedEmail);
         return mappingProfile.toDTO(saved);
     }
 
     @Transactional
-    public LoginResponseDTO login(LoginDTO dto){
+    public void login(LoginDTO dto){
+        String maskedEmail = LogSanitizer.maskEmail(dto.getEmail());
+        log.info("[AUTH] Login validation started - email={} sistemaId={}", maskedEmail, dto.getSistemaId());
         Sistema sistema = sistemaRepository.findById(dto.getSistemaId())
                 .orElseThrow(() -> new NotFoundException(ErrorMessages.Recursos.SISTEMA_NAO_ENCONTRADO));
 
@@ -71,17 +86,65 @@ public class AuthService {
         UsuarioSistema usuarioSistema = usuarioSistemaRepository.findByUsuarioAndSistema(usuario, sistema)
                 .orElseThrow(() -> new NotFoundException(ErrorMessages.Recursos.USUARIO_NAO_ENCONTRADO_SISTEMA));
 
-        if(!encoder.matches(dto.getSenha(), usuario.getSenha()))
+        if(!encoder.matches(dto.getSenha(), usuario.getSenha())) {
+            log.warn("[AUTH] Login validation failed - reason=invalid_credentials email={} sistemaId={}", maskedEmail, sistema.getId());
             throw new NotFoundException(ErrorMessages.Auth.CREDENCIAIS_INVALIDAS);
+        }
 
-        // gera o access token com todas as claims
-        String token = jwtService.generateToken(usuarioSistema);
+        log.info("[AUTH] Login validation success - userId={} sistemaId={}", usuario.getId(), sistema.getId());
+        verificationCodeService.generateAndSend(usuario, TipoVerificacao.LOGIN);
+    }
 
-        // cria o refresh token e salva no banco
-        RefreshToken refreshToken = jwtService.createRefreshToken(usuario);
+    @Transactional
+    public void alterarSenha(UUID usuarioId, AlterarSenhaDTO dto) {
+        log.info("[AUTH] Password change requested - userId={}", usuarioId);
+        Usuario usuario = usuarioRepository.findById(usuarioId)
+                .orElseThrow(() -> new NotFoundException(ErrorMessages.Recursos.USUARIO_NAO_ENCONTRADO));
 
-        // retorna ambos
-        return new LoginResponseDTO(token, refreshToken.getToken());
+        validarSenha(dto.getNovaSenha());
+
+        // valida a senha atual
+        if (!encoder.matches(dto.getSenhaAtual(), usuario.getSenha())) {
+            log.warn("[AUTH] Password change failed - reason=invalid_current_password userId={}", usuarioId);
+            throw new ValidationException("Senha atual incorreta.");
+        }
+
+        // valida se a nova senha já foi usada antes
+        senhaHistoricoService.validarSenhaNaoReutilizada(usuario, dto.getNovaSenha());
+
+        log.info("[AUTH] Password policy validated - userId={}", usuarioId);
+        String novaSenhaHash = encoder.encode(dto.getNovaSenha());
+        verificationCodeService.generateAndSend(usuario, TipoVerificacao.ALTERAR_SENHA, novaSenhaHash);
+        log.info("[AUTH] Password change verification sent - userId={}", usuarioId);
+    }
+
+    @Transactional
+    public void confirmarAlteracaoSenha(String code) {
+        log.info("[AUTH] Password change verification started");
+
+        VerificationCode verificationCode = verificationCodeService.validateCode(code, TipoVerificacao.ALTERAR_SENHA);
+        Usuario usuario = verificationCode.getUsuario();
+
+        // salva a senha atual no histórico antes de trocar
+        senhaHistoricoService.salvarNoHistorico(usuario, usuario.getSenha());
+
+        // aplica a nova senha que estava guardada no código
+        usuario.setSenha(verificationCode.getNovaSenhaHash());
+        usuarioRepository.save(usuario);
+
+        log.info("[AUTH] Password change completed - userId={}", usuario.getId());
+    }
+
+    @Transactional
+    public void logout() {
+        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+        String usuarioId = (String) authentication.getPrincipal();
+
+        Usuario usuario = usuarioRepository.findById(UUID.fromString(usuarioId))
+                .orElseThrow(() -> new NotFoundException(ErrorMessages.Recursos.USUARIO_NAO_ENCONTRADO));
+
+        jwtService.deleteByUsuario(usuario);
+        log.info("[AUTH] Logout realizado. usuarioId={}", usuarioId);
     }
 
     /////// utilitários /////////

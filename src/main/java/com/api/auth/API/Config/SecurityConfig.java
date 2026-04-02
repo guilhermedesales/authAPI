@@ -13,10 +13,12 @@ import org.springframework.security.web.authentication.UsernamePasswordAuthentic
 @EnableWebSecurity
 public class SecurityConfig {
 
-    private final JwtAuthFilter  jwtAuthFilter;
+    private final JwtAuthFilter jwtAuthFilter;
+    private final RequestLoggingFilter requestLoggingFilter;
 
-    public SecurityConfig(JwtAuthFilter jwtAuthFilter) {
+    public SecurityConfig(JwtAuthFilter jwtAuthFilter, RequestLoggingFilter requestLoggingFilter) {
         this.jwtAuthFilter = jwtAuthFilter;
+        this.requestLoggingFilter = requestLoggingFilter;
     }
 
     @Bean
@@ -36,9 +38,14 @@ public class SecurityConfig {
                                 "/v3/api-docs/**",
                                 "/h2-console/**"
                         ).permitAll()
-                        .requestMatchers("/health/validateJWT").authenticated()
+                        .requestMatchers(
+                                "/health/validateJWT",
+                                "/auth/logout",
+                                "/auth/alterar-senha"
+                        ).authenticated()
                         .anyRequest().permitAll()
                 )
+                .addFilterBefore(requestLoggingFilter, UsernamePasswordAuthenticationFilter.class)
                 .addFilterBefore(jwtAuthFilter, UsernamePasswordAuthenticationFilter.class)
                 .formLogin(form -> form.disable());
 

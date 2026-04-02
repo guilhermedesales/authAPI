@@ -14,6 +14,10 @@ public class AuthApplication {
         System.setProperty("JWT_EXPIRATION", dotenv.get("JWT_EXPIRATION"));
         System.setProperty("JWT_REFRESH_EXPIRATION", dotenv.get("JWT_REFRESH_EXPIRATION"));
 
+        System.setProperty("VERIFICATION_CODE_EXPIRATION", dotenv.get("VERIFICATION_CODE_EXPIRATION"));
+        System.setProperty("MAIL_USERNAME", dotenv.get("MAIL_USERNAME"));
+        System.setProperty("MAIL_PASSWORD", dotenv.get("MAIL_PASSWORD"));
+
 		SpringApplication.run(AuthApplication.class, args);
 	}
 

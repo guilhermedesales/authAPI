@@ -1,5 +1,6 @@
 package com.api.auth.Application.Service;
 
+import com.api.auth.Application.Exceptions.ValidationException;
 import com.api.auth.Domain.Entities.RefreshToken;
 import com.api.auth.Domain.Entities.Usuario;
 import com.api.auth.Domain.Entities.UsuarioSistema;
@@ -7,6 +8,7 @@ import com.api.auth.Infra.Repositories.RefreshTokenRepository;
 import io.jsonwebtoken.*;
 import io.jsonwebtoken.security.Keys;
 import jakarta.transaction.Transactional;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
@@ -16,6 +18,7 @@ import java.util.Date;
 import java.util.Optional;
 import java.util.UUID;
 
+@Slf4j
 @Service
 public class JwtService {
 
@@ -41,7 +44,7 @@ public class JwtService {
     public String generateToken(UsuarioSistema usuarioSistema) {
 
         Usuario usuario = usuarioSistema.getUsuario();
-        return Jwts.builder()
+        String token = Jwts.builder()
 
                 .setSubject(usuario.getId().toString()) // id do user
                 .claim("nome", usuario.getNome()) // nome do user
@@ -56,13 +59,21 @@ public class JwtService {
                 .setExpiration(new Date(System.currentTimeMillis() + expiration))
                 .signWith(getSignKey(), SignatureAlgorithm.HS256)
                 .compact();
+
+        log.info("[AUTH] Access token generated - userId={} sistemaId={} roleId={}",
+                usuario.getId(), usuarioSistema.getSistema().getId(), usuarioSistema.getRole().getId());
+        return token;
     }
 
     public boolean validateToken(String token) {
         try {
             Jwts.parserBuilder().setSigningKey(getSignKey()).build().parseClaimsJws(token);
             return true;
-        } catch (Exception e) {
+        } catch (ExpiredJwtException e) {
+            log.warn("[AUTH] Token validation failed - reason=expired");
+            return false;
+        } catch (JwtException | IllegalArgumentException e) {
+            log.warn("[AUTH] Token validation failed - reason=invalid");
             return false;
         }
     }
@@ -75,6 +86,7 @@ public class JwtService {
 
     @Transactional
     public RefreshToken createRefreshToken(Usuario usuario) {
+        log.debug("[AUTH] Rotating refresh token - userId={}", usuario.getId());
         refreshTokenRepository.deleteByUsuario(usuario);
         refreshTokenRepository.flush();
 
@@ -83,22 +95,26 @@ public class JwtService {
         refreshToken.setExpiryDate(Instant.now().plusMillis(refreshTokenDurationMs));
         refreshToken.setToken(UUID.randomUUID().toString());
         refreshTokenRepository.save(refreshToken);
+        log.info("[AUTH] Refresh token issued - userId={} expiresAt={}", usuario.getId(), refreshToken.getExpiryDate());
         return refreshToken;
     }
 
     public RefreshToken verifyExpiration(RefreshToken token) {
         if (token.getExpiryDate().isBefore(Instant.now())) {
             refreshTokenRepository.delete(token);
-            throw new RuntimeException("Refresh token expirado. Faça login novamente.");
+            log.warn("[AUTH] Refresh token expired - userId={}", token.getUsuario().getId());
+            throw new ValidationException("Refresh token expirado. Faça login novamente.");
         }
         return token;
     }
 
     public Optional<RefreshToken> findByToken(String token) {
+        log.debug("[AUTH] Refresh token lookup requested");
         return refreshTokenRepository.findByToken(token);
     }
 
     public void deleteByUsuario(Usuario usuario) {
+        log.info("[AUTH] Revoking refresh tokens - userId={}", usuario.getId());
         refreshTokenRepository.deleteByUsuario(usuario);
     }
 }

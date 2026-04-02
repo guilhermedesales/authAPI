@@ -68,5 +68,7 @@ public interface MappingProfile {
 
     /////////// USUARIO //////////
 
+    @Mapping(source = "createdAt", target = "createdAt")
+    @Mapping(source = "updatedAt", target = "updatedAt")
     RegistrarResponseDTO toDTO(Usuario usuario);
 }

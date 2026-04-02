@@ -13,6 +13,7 @@ import com.api.auth.Infra.Repositories.RoleRepository;
 import com.api.auth.Infra.Repositories.SistemaRepository;
 import com.api.auth.Infra.Repositories.UsuarioRepository;
 import com.api.auth.Infra.Repositories.UsuarioSistemaRepository;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
@@ -20,6 +21,7 @@ import org.springframework.stereotype.Service;
 import java.util.List;
 import java.util.UUID;
 
+@Slf4j
 @Service
 public class UsuarioSistemaService {
 
@@ -38,6 +40,8 @@ public class UsuarioSistemaService {
     }
 
     public UsuarioSistemaDTO criar(CriarUsuarioSistemaDTO dto) {
+        log.info("[USUARIO_SISTEMA] Link create started - usuarioId={} sistemaId={} roleId={}",
+                dto.getUsuarioId(), dto.getSistemaId(), dto.getRoleId());
 
         Sistema sistema = sistemaRepository.findById(dto.getSistemaId())
                 .orElseThrow(() -> new NotFoundException(ErrorMessages.Recursos.SISTEMA_NAO_ENCONTRADO));
@@ -51,8 +55,11 @@ public class UsuarioSistemaService {
         boolean existe = usuarioSistemaRepository
                 .existsByUsuarioIdAndSistemaId(dto.getUsuarioId(), dto.getSistemaId());
 
-        if (existe)
+        if (existe) {
+            log.warn("[USUARIO_SISTEMA] Link create blocked - reason=already_linked usuarioId={} sistemaId={}",
+                    dto.getUsuarioId(), dto.getSistemaId());
             throw new RuntimeException("Usuario já vinculado a este sistema");
+        }
 
         UsuarioSistema usuarioSistema = UsuarioSistema.builder()
                 .sistema(sistema)
@@ -61,10 +68,13 @@ public class UsuarioSistemaService {
                 .build();
 
         UsuarioSistema saved = usuarioSistemaRepository.save(usuarioSistema);
+        log.info("[USUARIO_SISTEMA] Link create success - usuarioSistemaId={}", saved.getId());
         return mappingProfile.toDTO(saved);
     }
 
     public Page<UsuarioSistemaDTO> listar(UUID usuarioId, UUID sistemaId, int page, int size) {
+        log.debug("[USUARIO_SISTEMA] List started - usuarioId={} sistemaId={} page={} size={}",
+                usuarioId, sistemaId, page, size);
         PageRequest pageable = PageRequest.of(page, size);
         Page<UsuarioSistema> lista;
 
@@ -80,17 +90,21 @@ public class UsuarioSistemaService {
         else // sem filtro
             lista = usuarioSistemaRepository.findAll(pageable);
 
+        log.debug("[USUARIO_SISTEMA] List success - totalElements={}", lista.getTotalElements());
         return lista.map(mappingProfile::toDTO);
 
     }
 
     public UsuarioSistemaDTO buscarPorId(UUID id){
+        log.debug("[USUARIO_SISTEMA] Find by id started - usuarioSistemaId={}", id);
         UsuarioSistema usuarioSistema = usuarioSistemaRepository.findById(id)
                 .orElseThrow(() -> new NotFoundException(ErrorMessages.Recursos.SISTEMA_NAO_ENCONTRADO));
+        log.debug("[USUARIO_SISTEMA] Find by id success - usuarioSistemaId={}", usuarioSistema.getId());
         return mappingProfile.toDTO(usuarioSistema);
     }
 
     public UsuarioSistemaDTO mudarRoleUser(UUID usuarioSistemaId, UUID novaRoleId) {
+        log.info("[USUARIO_SISTEMA] Change role started - usuarioSistemaId={} novaRoleId={}", usuarioSistemaId, novaRoleId);
 
         UsuarioSistema usuarioSistema = usuarioSistemaRepository.findById(usuarioSistemaId)
                 .orElseThrow(() -> new NotFoundException(ErrorMessages.Recursos.SISTEMA_NAO_ENCONTRADO));
@@ -102,14 +116,17 @@ public class UsuarioSistemaService {
         usuarioSistema.setRole(novaRole);
         UsuarioSistema updated = usuarioSistemaRepository.save(usuarioSistema);
 
+        log.info("[USUARIO_SISTEMA] Change role success - usuarioSistemaId={} roleId={}", updated.getId(), updated.getRole().getId());
         return mappingProfile.toDTO(updated);
     }
 
     public void remover(UUID usuarioSistemaId) {
+        log.info("[USUARIO_SISTEMA] Remove started - usuarioSistemaId={}", usuarioSistemaId);
 
         UsuarioSistema usuarioSistema = usuarioSistemaRepository.findById(usuarioSistemaId)
                 .orElseThrow(() -> new NotFoundException(ErrorMessages.Recursos.SISTEMA_NAO_ENCONTRADO));
 
         usuarioSistemaRepository.delete(usuarioSistema);
+        log.info("[USUARIO_SISTEMA] Remove success - usuarioSistemaId={}", usuarioSistemaId);
     }
 }
