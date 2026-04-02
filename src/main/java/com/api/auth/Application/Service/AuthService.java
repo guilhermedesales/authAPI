@@ -139,12 +139,13 @@ public class AuthService {
     public void logout() {
         Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
         String usuarioId = (String) authentication.getPrincipal();
+        log.info("[AUTH] Logout requested - userId={}", usuarioId);
 
         Usuario usuario = usuarioRepository.findById(UUID.fromString(usuarioId))
                 .orElseThrow(() -> new NotFoundException(ErrorMessages.Recursos.USUARIO_NAO_ENCONTRADO));
 
-        jwtService.deleteByUsuario(usuario);
-        log.info("[AUTH] Logout realizado. usuarioId={}", usuarioId);
+        jwtService.revokeAllByUsuario(usuario);
+        log.info("[AUTH] Logout success - all refresh tokens revoked - userId={}", usuarioId);
     }
 
     /////// utilitários /////////

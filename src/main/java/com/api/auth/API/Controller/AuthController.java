@@ -87,28 +87,20 @@ public class AuthController {
 
     @PostMapping("/refresh-token")
     public ResponseEntity<?> refreshToken(@RequestBody RefreshTokenDTO dto) {
-        log.info("[AUTH] Refresh token request");
+        log.info("[AUTH] Refresh token request received");
         String requestToken = dto.getRefreshToken();
 
-        return jwtService.findByToken(requestToken)
-                .map(jwtService::verifyExpiration)
-                .map(RefreshToken::getUsuario)
-                .map(usuario -> {
+        // Service performs reuse detection + rotation in a single transaction.
+        RefreshToken rotatedRefreshToken = jwtService.rotateRefreshToken(requestToken);
+        Usuario usuario = rotatedRefreshToken.getUsuario();
 
-                    UsuarioSistema usuarioSistema = usuarioSistemaRepository
-                            .findByUsuario(usuario)
-                            .orElseThrow(() -> new NotFoundException(ErrorMessages.Recursos.SISTEMA_NAO_ENCONTRADO));
+        UsuarioSistema usuarioSistema = usuarioSistemaRepository
+                .findByUsuario(usuario)
+                .orElseThrow(() -> new NotFoundException(ErrorMessages.Recursos.SISTEMA_NAO_ENCONTRADO));
 
-                    // gerar novo JWT
-                    String accessToken = jwtService.generateToken(usuarioSistema);
-
-                    // gerar refresh token rotativo
-                    RefreshToken newRefresh = jwtService.createRefreshToken(usuario);
-
-                    log.info("[AUTH] Refresh token success - userId={}", usuario.getId());
-                    return ResponseEntity.ok(new RefreshTokenResponseDTO(accessToken, newRefresh.getToken()));
-                })
-                .orElseThrow(() -> new NotFoundException(ErrorMessages.Recursos.REFRESH_TOKEN_NAO_ENCONTRADO));
+        String accessToken = jwtService.generateToken(usuarioSistema);
+        log.info("[AUTH] Refresh token success - userId={}", usuario.getId());
+        return ResponseEntity.ok(new RefreshTokenResponseDTO(accessToken, rotatedRefreshToken.getToken()));
     }
 
     @PutMapping("/alterar-senha")

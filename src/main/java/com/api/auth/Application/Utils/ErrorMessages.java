@@ -7,6 +7,7 @@ public final class ErrorMessages {
     public static class Auth {
         public static final String CREDENCIAIS_INVALIDAS = "E-mail ou senha inválidos.";
         public static final String SESSAO_EXPIRADA = "Sua sessão expirou. Faça login novamente.";
+        public static final String REFRESH_TOKEN_REUSE_DETECTADO = "Reutilização de refresh token detectada. Todas as sessões foram encerradas por segurança.";
         public static final String EMAIL_JA_CADASTRADO = "Esse email já possui uma conta cadastrada";
     }
 
