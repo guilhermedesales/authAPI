@@ -93,6 +93,9 @@ refresh valido -> rotate -> novo access + novo refresh
 
 ## 5. Endpoints
 
+<img width="1231" height="598" alt="image" src="https://github.com/user-attachments/assets/98f80779-d5b2-451b-abc4-8e624820a63a" />
+
+
 > Base path local: `http://localhost:8080`
 
 ### 5.1 Auth
