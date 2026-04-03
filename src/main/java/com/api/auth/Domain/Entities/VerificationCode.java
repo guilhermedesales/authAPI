@@ -19,7 +19,7 @@ public class VerificationCode {
     @Column(nullable = false)
     private String code;
 
-    @OneToOne
+    @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "usuario_id")
     private Usuario usuario;
 
@@ -33,4 +33,9 @@ public class VerificationCode {
     private TipoVerificacao tipo; // LOGIN, ALTERAR_SENHA, etc
 
     private String novaSenhaHash; // usado apenas no fluxo de alterar senha
+
+    // Challenge usado no fluxo de esqueci senha para separar "validar código" de "trocar senha".
+    private UUID challengeId;
+    private Instant challengeExpiryDate;
+    private boolean challengeUsed = false;
 }

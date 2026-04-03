@@ -1,6 +1,10 @@
 package com.api.auth.API.Controller;
 
 import com.api.auth.Application.DTOs.Auth.AlterarSenhaDTO;
+import com.api.auth.Application.DTOs.Auth.EsqueciSenha.EsqueciSenhaConfirmDTO;
+import com.api.auth.Application.DTOs.Auth.EsqueciSenha.EsqueciSenhaDTO;
+import com.api.auth.Application.DTOs.Auth.EsqueciSenha.EsqueciSenhaVerifyCodeDTO;
+import com.api.auth.Application.DTOs.Auth.EsqueciSenha.EsqueciSenhaVerifyResponseDTO;
 import com.api.auth.Application.DTOs.Auth.Login.LoginDTO;
 import com.api.auth.Application.DTOs.Auth.Login.LoginResponseDTO;
 import com.api.auth.Application.DTOs.Auth.RefreshToken.RefreshTokenDTO;
@@ -27,7 +31,6 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
-import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.UUID;
@@ -124,5 +127,24 @@ public class AuthController {
     public ResponseEntity<Void> logout() {
         authService.logout();
         return ResponseEntity.noContent().build();
+    }
+
+    @PostMapping("/esqueci-senha/request")
+    public ResponseEntity<Void> esqueciSenhaRequest(@RequestBody @Valid EsqueciSenhaDTO dto) {
+        log.info("[AUTH] Forgot-password request endpoint hit - email={}", LogSanitizer.maskEmail(dto.getEmail()));
+        authService.esqueciSenha(dto);
+        return ResponseEntity.noContent().build();
+    }
+
+    @PostMapping("/esqueci-senha/verify-code")
+    public ResponseEntity<EsqueciSenhaVerifyResponseDTO> esqueciSenhaVerifyCode(@RequestBody @Valid EsqueciSenhaVerifyCodeDTO dto) {
+        UUID challengeId = authService.verificarCodigoEsqueciSenha(dto);
+        return ResponseEntity.ok(new EsqueciSenhaVerifyResponseDTO(challengeId));
+    }
+
+    @PostMapping("/esqueci-senha/confirm")
+    public ResponseEntity<LoginResponseDTO> esqueciSenhaConfirm(@RequestBody @Valid EsqueciSenhaConfirmDTO dto) {
+        LoginResponseDTO response = authService.confirmarEsqueciSenha(dto);
+        return ResponseEntity.ok(response);
     }
 }

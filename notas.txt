@@ -36,3 +36,10 @@
 
 /////////////////// 02/04/26
 
+    - add verificação de reuso do refresh token e invalida tokens ativos do user (melhorar isso com seções por device)
+
+    - add bloqueio de user apos errar a senha no login (3° tentativa bloq por 5 min as proximas em diante dobra, na 8° tentativa bloqueia o user ate mudar a senha)
+
+////////////////// 03/04/26
+
+    - add fluxo de esqueci senha com 3 endpoints (enviar cod para email, validar cod e mudar senha com challengeId q retorna da verificação do cod)

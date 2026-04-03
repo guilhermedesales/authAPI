@@ -17,6 +17,7 @@ import org.springframework.stereotype.Service;
 
 import java.security.SecureRandom;
 import java.time.Instant;
+import java.util.UUID;
 
 @Slf4j
 @Service
@@ -30,6 +31,9 @@ public class VerificationCodeService {
     @Value("${VERIFICATION_CODE_EXPIRATION}")
     private long expirationMs;
 
+    @Value("${VERIFICATION_CHALLENGE_EXPIRATION:600000}")
+    private long challengeExpirationMs;
+
     @Transactional
     public void generateAndSend(Usuario usuario, TipoVerificacao tipo) {
         generateAndSend(usuario, tipo, null);
@@ -38,7 +42,7 @@ public class VerificationCodeService {
     @Transactional
     public void generateAndSend(Usuario usuario, TipoVerificacao tipo, String novaSenhaHash) {
         log.info("[AUTH] Generating verification code - userId={} tipo={}", usuario.getId(), tipo);
-        verificationCodeRepository.deleteByUsuario(usuario);
+        verificationCodeRepository.deleteByUsuarioAndTipo(usuario, tipo);
         verificationCodeRepository.flush();
 
         String code = String.format("%06d", new SecureRandom().nextInt(999999));
@@ -50,6 +54,9 @@ public class VerificationCodeService {
         verificationCode.setUsed(false);
         verificationCode.setTipo(tipo);
         verificationCode.setNovaSenhaHash(novaSenhaHash);
+        verificationCode.setChallengeId(null);
+        verificationCode.setChallengeExpiryDate(null);
+        verificationCode.setChallengeUsed(false);
 
         verificationCodeRepository.save(verificationCode);
         emailService.sendVerificationCode(usuario.getEmail(), code);
@@ -93,6 +100,58 @@ public class VerificationCodeService {
         }
 
         log.info("[AUTH] Verification code validated - userId={} tipo={}", usuario.getId(), tipoEsperado);
+        return verificationCode;
+    }
+
+    @Transactional
+    public UUID validateForgotPasswordCode(String email, String code) {
+        String maskedEmail = LogSanitizer.maskEmail(email);
+        log.info("[AUTH] Validating forgot-password code - email={}", maskedEmail);
+
+        VerificationCode verificationCode = verificationCodeRepository
+                .findByCodeAndUsuarioEmailAndTipo(code, email, TipoVerificacao.ESQUECI_SENHA)
+                .orElseThrow(() -> new NotFoundException(ErrorMessages.CodigoEmail.CODIGO_INVALIDO));
+
+        if (verificationCode.isUsed()) {
+            throw new ValidationException(ErrorMessages.CodigoEmail.CODIGO_UTILIZADO);
+        }
+
+        if (verificationCode.getExpiryDate().isBefore(Instant.now())) {
+            throw new ValidationException(ErrorMessages.CodigoEmail.CODIGO_EXPIRADO);
+        }
+
+        verificationCode.setUsed(true);
+        verificationCode.setChallengeId(UUID.randomUUID());
+        verificationCode.setChallengeExpiryDate(Instant.now().plusMillis(challengeExpirationMs));
+        verificationCode.setChallengeUsed(false);
+        verificationCodeRepository.save(verificationCode);
+
+        log.info("[AUTH] Forgot-password code validated - userId={} challengeId={}",
+                verificationCode.getUsuario().getId(), verificationCode.getChallengeId());
+        return verificationCode.getChallengeId();
+    }
+
+    @Transactional
+    public VerificationCode validateForgotPasswordChallenge(UUID challengeId) {
+        VerificationCode verificationCode = verificationCodeRepository
+                .findByChallengeIdAndTipo(challengeId, TipoVerificacao.ESQUECI_SENHA)
+                .orElseThrow(() -> new ValidationException(ErrorMessages.CodigoEmail.CODIGO_INVALIDO));
+
+        if (!verificationCode.isUsed()) {
+            throw new ValidationException(ErrorMessages.CodigoEmail.CODIGO_INVALIDO);
+        }
+
+        if (verificationCode.isChallengeUsed()) {
+            throw new ValidationException(ErrorMessages.CodigoEmail.CODIGO_UTILIZADO);
+        }
+
+        if (verificationCode.getChallengeExpiryDate() == null ||
+                verificationCode.getChallengeExpiryDate().isBefore(Instant.now())) {
+            throw new ValidationException(ErrorMessages.CodigoEmail.CODIGO_EXPIRADO);
+        }
+
+        verificationCode.setChallengeUsed(true);
+        verificationCodeRepository.save(verificationCode);
         return verificationCode;
     }
 }

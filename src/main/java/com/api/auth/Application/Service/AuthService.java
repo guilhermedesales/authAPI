@@ -1,6 +1,9 @@
 package com.api.auth.Application.Service;
 
 import com.api.auth.Application.DTOs.Auth.AlterarSenhaDTO;
+import com.api.auth.Application.DTOs.Auth.EsqueciSenha.EsqueciSenhaConfirmDTO;
+import com.api.auth.Application.DTOs.Auth.EsqueciSenha.EsqueciSenhaDTO;
+import com.api.auth.Application.DTOs.Auth.EsqueciSenha.EsqueciSenhaVerifyCodeDTO;
 import com.api.auth.Application.DTOs.Auth.Login.LoginDTO;
 import com.api.auth.Application.DTOs.Auth.Login.LoginResponseDTO;
 import com.api.auth.Application.DTOs.Auth.Registrar.RegistrarDTO;
@@ -23,6 +26,7 @@ import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 
+import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
@@ -39,9 +43,10 @@ public class AuthService {
     private final MappingProfile mappingProfile;
     private final VerificationCodeService verificationCodeService;
     private final SenhaHistoricoService senhaHistoricoService;
+    private final TentativasLoginService tentativasLoginService;
 
     @Autowired
-    public AuthService(UsuarioRepository usuarioRepository, JwtService jwtService, PasswordEncoder encoder, SistemaRepository sistemaRepository, UsuarioSistemaRepository usuarioSistemaRepository, MappingProfile mappingProfile, VerificationCodeService verificationCodeService, SenhaHistoricoService senhaHistoricoService) {
+    public AuthService(UsuarioRepository usuarioRepository, JwtService jwtService, PasswordEncoder encoder, SistemaRepository sistemaRepository, UsuarioSistemaRepository usuarioSistemaRepository, MappingProfile mappingProfile, VerificationCodeService verificationCodeService, SenhaHistoricoService senhaHistoricoService, TentativasLoginService tentativasLoginService) {
         this.usuarioRepository = usuarioRepository;
         this.jwtService = jwtService;
         this.sistemaRepository = sistemaRepository;
@@ -50,6 +55,7 @@ public class AuthService {
         this.mappingProfile = mappingProfile;
         this.verificationCodeService = verificationCodeService;
         this.senhaHistoricoService = senhaHistoricoService;
+        this.tentativasLoginService = tentativasLoginService;
     }
 
     public RegistrarResponseDTO registrar(RegistrarDTO dto) {
@@ -77,21 +83,35 @@ public class AuthService {
     public void login(LoginDTO dto){
         String maskedEmail = LogSanitizer.maskEmail(dto.getEmail());
         log.info("[AUTH] Login validation started - email={} sistemaId={}", maskedEmail, dto.getSistemaId());
+
         Sistema sistema = sistemaRepository.findById(dto.getSistemaId())
                 .orElseThrow(() -> new NotFoundException(ErrorMessages.Recursos.SISTEMA_NAO_ENCONTRADO));
 
         Usuario usuario = usuarioRepository.findByEmail(dto.getEmail())
                 .orElseThrow(() -> new NotFoundException(ErrorMessages.Recursos.USUARIO_NAO_ENCONTRADO));
 
+        if(usuario.getBloqueadoAte() != null && usuario.getBloqueadoAte().isAfter(LocalDateTime.now())){
+            throw new ValidationException("Usuário bloqueado até "+ usuario.getBloqueadoAte());
+        }
+
+        else if(usuario.isBloqueado()){
+            throw new ValidationException("Usuário falhou em logar muitas vezes, para continuar é necessário alterar a senha");
+        }
+
         UsuarioSistema usuarioSistema = usuarioSistemaRepository.findByUsuarioAndSistema(usuario, sistema)
                 .orElseThrow(() -> new NotFoundException(ErrorMessages.Recursos.USUARIO_NAO_ENCONTRADO_SISTEMA));
 
         if(!encoder.matches(dto.getSenha(), usuario.getSenha())) {
             log.warn("[AUTH] Login validation failed - reason=invalid_credentials email={} sistemaId={}", maskedEmail, sistema.getId());
-            throw new NotFoundException(ErrorMessages.Auth.CREDENCIAIS_INVALIDAS);
+
+            String mensagem = tentativasLoginService.registrarTentativaFalha(usuario, sistema);
+            throw new ValidationException(mensagem);
         }
 
         log.info("[AUTH] Login validation success - userId={} sistemaId={}", usuario.getId(), sistema.getId());
+        usuario.setTentativasFalhas(0);
+        usuario.setBloqueadoAte(null);
+        usuarioRepository.save(usuario);
         verificationCodeService.generateAndSend(usuario, TipoVerificacao.LOGIN);
     }
 
@@ -133,6 +153,68 @@ public class AuthService {
         usuarioRepository.save(usuario);
 
         log.info("[AUTH] Password change completed - userId={}", usuario.getId());
+    }
+
+    @Transactional
+    public void esqueciSenha(EsqueciSenhaDTO dto){
+        String maskedEmail = LogSanitizer.maskEmail(dto.getEmail());
+        log.info("[AUTH] Forgot-password request received - email={}", maskedEmail);
+
+        // Resposta é sempre "sucesso" para evitar enumeração de emails válidos
+        usuarioRepository.findByEmail(dto.getEmail()).ifPresentOrElse(
+                usuario -> {
+                    verificationCodeService.generateAndSend(usuario, TipoVerificacao.ESQUECI_SENHA, null);
+                    log.info("[AUTH] Forgot-password code sent - userId={} email={}", usuario.getId(), maskedEmail);
+                },
+                () -> log.info("[AUTH] Forgot-password request processed for unknown email - email={}", maskedEmail)
+        );
+    }
+
+    @Transactional
+    public UUID verificarCodigoEsqueciSenha(EsqueciSenhaVerifyCodeDTO dto) {
+        log.info("[AUTH] Forgot-password code verification started - email={}", LogSanitizer.maskEmail(dto.getEmail()));
+        UUID challengeId = verificationCodeService.validateForgotPasswordCode(dto.getEmail(), dto.getCode());
+        log.info("[AUTH] Forgot-password code verification success - challengeId={}", challengeId);
+        return challengeId;
+    }
+
+    @Transactional
+    public LoginResponseDTO confirmarEsqueciSenha(EsqueciSenhaConfirmDTO dto) {
+        log.info("[AUTH] Forgot-password confirmation started - challengeId={}", dto.getChallengeId());
+
+        if (!dto.getNovaSenha().equals(dto.getConfirmarNovaSenha())) {
+            throw new ValidationException("Nova senha e confirmação não conferem.");
+        }
+
+        validarSenha(dto.getNovaSenha());
+
+        VerificationCode verificationCode = verificationCodeService.validateForgotPasswordChallenge(dto.getChallengeId());
+        Usuario usuario = verificationCode.getUsuario();
+
+        // Impede reutilização de senhas antigas tambem no fluxo de recuperação
+        senhaHistoricoService.validarSenhaNaoReutilizada(usuario, dto.getNovaSenha());
+        senhaHistoricoService.salvarNoHistorico(usuario, usuario.getSenha());
+
+        usuario.setSenha(encoder.encode(dto.getNovaSenha()));
+        usuario.setBloqueado(false);
+        usuario.setTentativasFalhas(0);
+        usuario.setBloqueadoAte(null);
+        usuarioRepository.save(usuario);
+
+        // Revoga sessões antigas antes de emitir novos tokens
+        jwtService.revokeAllByUsuario(usuario);
+
+        Sistema sistema = sistemaRepository.findById(dto.getSistemaId())
+                .orElseThrow(() -> new NotFoundException(ErrorMessages.Recursos.SISTEMA_NAO_ENCONTRADO));
+
+        UsuarioSistema usuarioSistema = usuarioSistemaRepository.findByUsuarioAndSistema(usuario, sistema)
+                .orElseThrow(() -> new NotFoundException(ErrorMessages.Recursos.USUARIO_NAO_ENCONTRADO_SISTEMA));
+
+        String accessToken = jwtService.generateToken(usuarioSistema);
+        RefreshToken refreshToken = jwtService.createRefreshToken(usuario);
+
+        log.info("[AUTH] Forgot-password confirmation success - userId={} sistemaId={}", usuario.getId(), sistema.getId());
+        return new LoginResponseDTO(accessToken, refreshToken.getToken());
     }
 
     @Transactional

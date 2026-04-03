@@ -22,7 +22,11 @@ public class Usuario extends BaseEntity {
     private String email;
     private String senha;
     private boolean ativo;
+
     @Builder.Default
     private boolean emailConfirmado = false;
 
+    private boolean bloqueado = false;
+    private int tentativasFalhas = 0;
+    private LocalDateTime bloqueadoAte;
 }
