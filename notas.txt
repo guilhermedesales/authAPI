@@ -16,10 +16,30 @@
 
 - não permitir mudar senha para uma senha ja usada antes (lista de 3 - 5)
 
-teste login:
+- endpoint de logout (invalidar refresh token)
 
-{
-  "email": "email@gmail.com",
-  "senha": "Senha12345@",
-  "sistemaId": "4a5c73b0-2bac-4ca3-abe9-ca5831c01f8b"
-}
+- guardar sessão do user por device (ip, pc/celular, endereço resumido) - usar isso pra configurar logica de login suspeito
+
+- verificar se refresh invalido foi usado pra tentar acessar o sistema (limpar os tokens ativos dessa conta)
+
+//////////////////// 30/03/26
+
+    fluxo de mudar senha ta falhando, a senha na tabela do user fica null
+
+    adicionar logs pra encontrar problema
+
+////////////////// 01/04/26
+
+    - adicinei os logs e no fim não aconteceu mais o problema da senha null
+
+    - adicionei endpoint de logout q invalida o refresh token (talvez adicionar uma blacklist pra invalidar o access token tbm)
+
+/////////////////// 02/04/26
+
+    - add verificação de reuso do refresh token e invalida tokens ativos do user (melhorar isso com seções por device)
+
+    - add bloqueio de user apos errar a senha no login (3° tentativa bloq por 5 min as proximas em diante dobra, na 8° tentativa bloqueia o user ate mudar a senha)
+
+////////////////// 03/04/26
+
+    - add fluxo de esqueci senha com 3 endpoints (enviar cod para email, validar cod e mudar senha com challengeId q retorna da verificação do cod)
