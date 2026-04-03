@@ -19,10 +19,14 @@ public interface RefreshTokenRepository extends JpaRepository<RefreshToken, UUID
 
     List<RefreshToken> findAllByUsuario(Usuario usuario);
 
-    @Modifying
+    @Modifying(clearAutomatically = true)
     @Transactional
-    @Query("UPDATE RefreshToken rt SET rt.revoked = true WHERE rt.usuario = :usuario AND rt.revoked = false")
-    int revokeAllByUsuario(@Param("usuario") Usuario usuario);
+        @Query("""
+        UPDATE RefreshToken rt
+        SET rt.revoked = true
+        WHERE rt.usuario.id = :usuarioId AND rt.revoked = false
+    """)
+    int revokeAllByUsuarioId(@Param("usuarioId") UUID usuarioId);
 
     Optional<RefreshToken> findByTokenId(String tokenId);
 

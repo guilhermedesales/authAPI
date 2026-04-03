@@ -44,9 +44,10 @@ public class AuthService {
     private final VerificationCodeService verificationCodeService;
     private final SenhaHistoricoService senhaHistoricoService;
     private final TentativasLoginService tentativasLoginService;
+    private final RefreshTokenService refreshTokenService;
 
     @Autowired
-    public AuthService(UsuarioRepository usuarioRepository, JwtService jwtService, PasswordEncoder encoder, SistemaRepository sistemaRepository, UsuarioSistemaRepository usuarioSistemaRepository, MappingProfile mappingProfile, VerificationCodeService verificationCodeService, SenhaHistoricoService senhaHistoricoService, TentativasLoginService tentativasLoginService) {
+    public AuthService(UsuarioRepository usuarioRepository, JwtService jwtService, PasswordEncoder encoder, SistemaRepository sistemaRepository, UsuarioSistemaRepository usuarioSistemaRepository, MappingProfile mappingProfile, VerificationCodeService verificationCodeService, SenhaHistoricoService senhaHistoricoService, TentativasLoginService tentativasLoginService, RefreshTokenService refreshTokenService) {
         this.usuarioRepository = usuarioRepository;
         this.jwtService = jwtService;
         this.sistemaRepository = sistemaRepository;
@@ -56,6 +57,7 @@ public class AuthService {
         this.verificationCodeService = verificationCodeService;
         this.senhaHistoricoService = senhaHistoricoService;
         this.tentativasLoginService = tentativasLoginService;
+        this.refreshTokenService = refreshTokenService;
     }
 
     public RegistrarResponseDTO registrar(RegistrarDTO dto) {
@@ -152,6 +154,8 @@ public class AuthService {
         usuario.setSenha(verificationCode.getNovaSenhaHash());
         usuarioRepository.save(usuario);
 
+        refreshTokenService.revokeAllByUsuario(usuario);
+
         log.info("[AUTH] Password change completed - userId={}", usuario.getId());
     }
 
@@ -202,7 +206,7 @@ public class AuthService {
         usuarioRepository.save(usuario);
 
         // Revoga sessões antigas antes de emitir novos tokens
-        jwtService.revokeAllByUsuario(usuario);
+        refreshTokenService.revokeAllByUsuario(usuario);
 
         Sistema sistema = sistemaRepository.findById(dto.getSistemaId())
                 .orElseThrow(() -> new NotFoundException(ErrorMessages.Recursos.SISTEMA_NAO_ENCONTRADO));
@@ -226,7 +230,7 @@ public class AuthService {
         Usuario usuario = usuarioRepository.findById(UUID.fromString(usuarioId))
                 .orElseThrow(() -> new NotFoundException(ErrorMessages.Recursos.USUARIO_NAO_ENCONTRADO));
 
-        jwtService.revokeAllByUsuario(usuario);
+        refreshTokenService.revokeAllByUsuario(usuario);
         log.info("[AUTH] Logout success - all refresh tokens revoked - userId={}", usuarioId);
     }
 
