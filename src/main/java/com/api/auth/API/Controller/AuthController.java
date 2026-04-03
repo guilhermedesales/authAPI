@@ -15,11 +15,9 @@ import com.api.auth.Application.DTOs.Auth.VerifyCodeDTO;
 import com.api.auth.Application.Exceptions.NotFoundException;
 import com.api.auth.Application.Service.AuthService;
 import com.api.auth.Application.Service.JwtService;
-import com.api.auth.Application.Service.UsuarioService;
 import com.api.auth.Application.Service.VerificationCodeService;
 import com.api.auth.Application.Utils.ErrorMessages;
 import com.api.auth.Application.Utils.LogSanitizer;
-import com.api.auth.Domain.Entities.RefreshToken;
 import com.api.auth.Domain.Entities.Usuario;
 import com.api.auth.Domain.Entities.UsuarioSistema;
 import com.api.auth.Domain.Entities.VerificationCode;
@@ -41,14 +39,12 @@ import java.util.UUID;
 @Tag(name = "Auth")
 public class AuthController {
 
-    private final UsuarioService usuarioService;
     private final AuthService authService;
     private final JwtService jwtService;
     private final UsuarioSistemaRepository usuarioSistemaRepository;
     private final VerificationCodeService verificationCodeService;
 
-    public AuthController(UsuarioService usuarioService, AuthService authService, JwtService jwtService, UsuarioSistemaRepository usuarioSistemaRepository, VerificationCodeService verificationCodeService) {
-        this.usuarioService = usuarioService;
+    public AuthController(AuthService authService, JwtService jwtService, UsuarioSistemaRepository usuarioSistemaRepository, VerificationCodeService verificationCodeService) {
         this.authService = authService;
         this.jwtService = jwtService;
         this.usuarioSistemaRepository = usuarioSistemaRepository;
@@ -82,10 +78,10 @@ public class AuthController {
                 .orElseThrow(() -> new NotFoundException(ErrorMessages.Recursos.SISTEMA_NAO_ENCONTRADO));
 
         String accessToken = jwtService.generateToken(usuarioSistema);
-        RefreshToken refreshToken = jwtService.createRefreshToken(usuario);
+        String refreshToken = jwtService.createRefreshToken(usuario);
 
         log.info("[AUTH] Login success - userId={} sistemaId={}", usuario.getId(), usuarioSistema.getSistema().getId());
-        return ResponseEntity.ok(new LoginResponseDTO(accessToken, refreshToken.getToken()));
+        return ResponseEntity.ok(new LoginResponseDTO(accessToken, refreshToken));
     }
 
     @PostMapping("/refresh-token")
@@ -94,8 +90,8 @@ public class AuthController {
         String requestToken = dto.getRefreshToken();
 
         // Service performs reuse detection + rotation in a single transaction.
-        RefreshToken rotatedRefreshToken = jwtService.rotateRefreshToken(requestToken);
-        Usuario usuario = rotatedRefreshToken.getUsuario();
+        JwtService.RefreshRotationResult rotationResult = jwtService.rotateRefreshToken(requestToken);
+        Usuario usuario = rotationResult.usuario();
 
         UsuarioSistema usuarioSistema = usuarioSistemaRepository
                 .findByUsuario(usuario)
@@ -103,7 +99,7 @@ public class AuthController {
 
         String accessToken = jwtService.generateToken(usuarioSistema);
         log.info("[AUTH] Refresh token success - userId={}", usuario.getId());
-        return ResponseEntity.ok(new RefreshTokenResponseDTO(accessToken, rotatedRefreshToken.getToken()));
+        return ResponseEntity.ok(new RefreshTokenResponseDTO(accessToken, rotationResult.refreshToken()));
     }
 
     @PutMapping("/alterar-senha")

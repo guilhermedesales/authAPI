@@ -20,6 +20,9 @@ public class RefreshToken {
     @GeneratedValue
     private UUID id;
 
+    @Column(unique = true)
+    private String tokenId;
+
     @Column(nullable = false, unique = true)
     private String token;
 
@@ -35,4 +38,11 @@ public class RefreshToken {
 
     @Column(nullable = false)
     private Instant expiryDate;
+
+    @PrePersist
+    public void ensureTokenId() {
+        if (tokenId == null || tokenId.isBlank()) {
+            tokenId = UUID.randomUUID().toString();
+        }
+    }
 }

@@ -1,3 +1,5 @@
+/////////////////// TODO LIST ///////////////////
+
 - criar um dto de retorno de user
 
 - adicionar refresh token
@@ -22,24 +24,48 @@
 
 - verificar se refresh invalido foi usado pra tentar acessar o sistema (limpar os tokens ativos dessa conta)
 
-//////////////////// 30/03/26
+
+/////////////////// HISTÓRICO DE DESENVOLVIMENTO ///////////////////
+
+
+//////////////////// 28/03/26 ///////////////////
+
+    - add lombok e refatora os dtos e entities
+
+    - add paginação nos gets (paginação padrão do spring, talvez criar um model de paginação personalizada)
+
+    - add endpoint de login q retrorna o access token (melhorar isso com refresh e validação por email)
+
+//////////////////// 29/03/26 ///////////////////
+
+    - add refresh token e endpoint pra gerar um novo access token usando o refresh token (refresh de 7 dias)
+
+    - padroniza mensagens de erro e add exceptions e middlewares
+
+//////////////////// 30/03/26 ///////////////////
 
     fluxo de mudar senha ta falhando, a senha na tabela do user fica null
 
     adicionar logs pra encontrar problema
 
-////////////////// 01/04/26
+////////////////// 01/04/26 ///////////////////
 
     - adicinei os logs e no fim não aconteceu mais o problema da senha null
 
     - adicionei endpoint de logout q invalida o refresh token (talvez adicionar uma blacklist pra invalidar o access token tbm)
 
-/////////////////// 02/04/26
+/////////////////// 02/04/26 ///////////////////
 
     - add verificação de reuso do refresh token e invalida tokens ativos do user (melhorar isso com seções por device)
 
     - add bloqueio de user apos errar a senha no login (3° tentativa bloq por 5 min as proximas em diante dobra, na 8° tentativa bloqueia o user ate mudar a senha)
 
-////////////////// 03/04/26
+////////////////// 03/04/26 ///////////////////
 
     - add fluxo de esqueci senha com 3 endpoints (enviar cod para email, validar cod e mudar senha com challengeId q retorna da verificação do cod)
+
+    - salva apenas hash do refresh no banco e cria id publico pra busca
+
+    - tem q melhorar o identificação de reuso do refresh, não ta revogando tokens ativos dps da tentativa de reuso
+
+    
