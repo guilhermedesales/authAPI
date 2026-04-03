@@ -52,7 +52,7 @@
 
 ## ⚠️ Problemas Atuais
 
-    - revogação de refresh dps de tentativa de reuso não funciona 100%
+    - nada agr
 
 
 ---
@@ -98,6 +98,6 @@
 
     - salva apenas hash do refresh no banco e cria id publico pra busca
 
-    - tem q melhorar o identificação de reuso do refresh, não ta revogando tokens ativos dps da tentativa de reuso
+    - arruma fluxo de reuso do refresh token
 
     

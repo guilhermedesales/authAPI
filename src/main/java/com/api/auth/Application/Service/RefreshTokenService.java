@@ -21,4 +21,5 @@ public class RefreshTokenService {
         int total = refreshTokenRepository.revokeAllByUsuarioId(usuario.getId());
         log.info("[AUTH] Refresh tokens revoked - userId={} total={}", usuario.getId(), total);
     }
+
 }
