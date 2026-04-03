@@ -28,6 +28,8 @@
 - [x] validação de email com código
 - [x] bloqueio por tentativas de login
 - [x] detectar uso de refresh inválido (revogar sessões)
+- [ ] invalidar sessão dps de mudar senha
+- [ ] rate limit por ip para login, esqueci senha, etc
 
 ### 🔑 Senha
 - [x] padrão forte
@@ -96,6 +98,6 @@
 
     - salva apenas hash do refresh no banco e cria id publico pra busca
 
-     tem q melhorar o identificação de reuso do refresh, não ta revogando tokens ativos dps da tentativa de reuso
+    - tem q melhorar o identificação de reuso do refresh, não ta revogando tokens ativos dps da tentativa de reuso
 
     

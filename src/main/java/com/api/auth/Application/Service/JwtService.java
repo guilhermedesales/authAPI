@@ -37,10 +37,12 @@ public class JwtService {
 
     private final RefreshTokenRepository refreshTokenRepository;
     private final PasswordEncoder encoder;
+    private final RefreshTokenService refreshTokenService;
 
-    public JwtService(RefreshTokenRepository refreshTokenRepository, PasswordEncoder encoder) {
+    public JwtService(RefreshTokenRepository refreshTokenRepository, PasswordEncoder encoder, RefreshTokenService refreshTokenService) {
         this.refreshTokenRepository = refreshTokenRepository;
         this.encoder = encoder;
+        this.refreshTokenService = refreshTokenService;
     }
 
     private Key getSignKey() {
@@ -151,14 +153,14 @@ public class JwtService {
 
         if (currentToken.isUsed() || currentToken.isRevoked()) {
             log.error("[AUTH] Refresh token reuse detected - userId={} tokenId={}", usuario.getId(), currentToken.getId());
-            revokeAllByUsuario(usuario);
+            refreshTokenService.revokeAllByUsuario(usuario);
             throw new ValidationException(ErrorMessages.Auth.REFRESH_TOKEN_REUSE_DETECTADO);
         }
 
         verifyExpiration(currentToken);
 
         currentToken.setUsed(true);
-        currentToken.setRevoked(true);
+        //currentToken.setRevoked(true);
         refreshTokenRepository.save(currentToken);
 
         String newRawToken = createRefreshToken(usuario);
@@ -168,13 +170,13 @@ public class JwtService {
         return new RefreshRotationResult(usuario, newRawToken);
     }
 
-    public void deleteByUsuario(Usuario usuario) {
-        revokeAllByUsuario(usuario);
-    }
+    //public void deleteByUsuario(Usuario usuario) {
+    //    revokeAllByUsuario(usuario);
+    //}
 
-    @Transactional
+    @Transactional(Transactional.TxType.REQUIRES_NEW)
     public void revokeAllByUsuario(Usuario usuario) {
-        int total = refreshTokenRepository.revokeAllByUsuario(usuario);
+        int total = refreshTokenRepository.revokeAllByUsuarioId(usuario.getId());
         log.info("[AUTH] Refresh tokens revoked - userId={} total={}", usuario.getId(), total);
     }
 
