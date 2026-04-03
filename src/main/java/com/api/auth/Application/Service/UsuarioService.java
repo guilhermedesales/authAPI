@@ -3,28 +3,24 @@ package com.api.auth.Application.Service;
 import com.api.auth.Application.DTOs.Usuario.CriarUsuarioDTO;
 import com.api.auth.Infra.Repositories.UsuarioRepository;
 import com.api.auth.Domain.Entities.Usuario;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
 
+@Slf4j
 @Service
 public class UsuarioService {
 
     private final UsuarioRepository usuarioRepository;
 
+    @Autowired
+    private PasswordEncoder encoder;
+
     public UsuarioService(UsuarioRepository usuarioRepository) {
         this.usuarioRepository = usuarioRepository;
-    }
-
-    public Usuario criar(CriarUsuarioDTO dto) {
-
-        Usuario usuario = new Usuario();
-
-        usuario.setNome(dto.getNome());
-        usuario.setEmail(dto.getEmail());
-        usuario.setSenha(dto.getSenha());
-
-        return usuarioRepository.save(usuario);
     }
 
     public List<Usuario> listar() {

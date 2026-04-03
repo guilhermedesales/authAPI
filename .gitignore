@@ -31,3 +31,27 @@ build/
 
 ### VS Code ###
 .vscode/
+
+.env
+
+# Arquivos compilados
+target/
+*.class
+
+# IDEs
+.idea/
+*.iml
+*.ipr
+*.iws
+.vscode/
+
+# Logs e temp
+*.log
+*.tmp
+
+# Arquivos do sistema
+.DS_Store
+Thumbs.db
+
+# Configuração sensível
+.env

@@ -1,17 +1,18 @@
 package com.api.auth.Application.DTOs.Role;
 
+import lombok.AllArgsConstructor;
+import lombok.Getter;
+import lombok.NoArgsConstructor;
+import lombok.Setter;
+
 import java.util.UUID;
 
+@Getter
+@AllArgsConstructor
 public class CriarRoleDTO {
 
-    private String nome;
-
     private UUID sistemaId;
-
-    public String getNome() {return nome;}
-    public void setNome(String nome) {this.nome = nome;}
-
-    public UUID getSistemaId() {return sistemaId;}
-    public void setSistemaId(UUID sistemaId) {this.sistemaId = sistemaId;}
+    private String nome;
+    private String descricao;
 
 }

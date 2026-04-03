@@ -1,32 +1,27 @@
 package com.api.auth.Application.DTOs.Permissao;
 
+import lombok.AllArgsConstructor;
+import lombok.Getter;
+import lombok.NoArgsConstructor;
+import lombok.Setter;
+
+import java.time.LocalDateTime;
 import java.util.UUID;
 
+@Getter
+@AllArgsConstructor
 public class PermissaoDTO {
 
     private UUID id;
     private String nome;
+    private String descricao;
 
     private UUID roleId;
     private String roleNome;
 
-    public PermissaoDTO(UUID id, String nome, UUID roleId, String roleNome) {
-        this.id = id;
-        this.nome = nome;
-        this.roleId = roleId;
-        this.roleNome = roleNome;
-    }
+    private UUID sistemaId;
+    private String sistemaNome;
 
-    public  UUID getId() {return id;}
-    public void setId(UUID id) {this.id = id;}
-
-    public String getNome() {return nome;}
-    public void setNome(String nome) {this.nome = nome;}
-
-    public UUID getRoleId() {return roleId;}
-    public void setRoleId(UUID roleId) {this.roleId = roleId;}
-
-    public String getRoleNome() {return roleNome;}
-    public void setRoleNome(String roleNome) {this.roleNome = roleNome;}
-
+    private LocalDateTime createdAt;
+    private LocalDateTime updatedAt;
 }

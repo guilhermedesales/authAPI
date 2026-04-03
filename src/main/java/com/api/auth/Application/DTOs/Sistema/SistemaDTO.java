@@ -1,19 +1,26 @@
 package com.api.auth.Application.DTOs.Sistema;
 
+import com.api.auth.Application.DTOs.Role.RoleDTO;
+import com.api.auth.Application.DTOs.Role.RoleResumoDTO;
+import com.api.auth.Domain.Entities.Role;
+import lombok.AllArgsConstructor;
+import lombok.Getter;
+import lombok.NoArgsConstructor;
+import lombok.Setter;
+
+import java.time.LocalDateTime;
+import java.util.List;
 import java.util.UUID;
 
+@Getter
+@AllArgsConstructor
 public class SistemaDTO {
 
     private UUID id;
     private String nome;
+    private String descricao;
+    private List<RoleResumoDTO> roles;
 
-    public SistemaDTO(UUID id, String nome) {
-        this.id = id;
-        this.nome = nome;
-    }
-
-    public UUID getId() {return id;}
-    public String getNome() {return nome;}
-    public void setNome(String nome) {this.nome = nome;}
-
+    private LocalDateTime createdAt;
+    private LocalDateTime updatedAt;
 }
