@@ -211,10 +211,10 @@ public class AuthService {
                 .orElseThrow(() -> new NotFoundException(ErrorMessages.Recursos.USUARIO_NAO_ENCONTRADO_SISTEMA));
 
         String accessToken = jwtService.generateToken(usuarioSistema);
-        RefreshToken refreshToken = jwtService.createRefreshToken(usuario);
+        String refreshToken = jwtService.createRefreshToken(usuario);
 
         log.info("[AUTH] Forgot-password confirmation success - userId={} sistemaId={}", usuario.getId(), sistema.getId());
-        return new LoginResponseDTO(accessToken, refreshToken.getToken());
+        return new LoginResponseDTO(accessToken, refreshToken);
     }
 
     @Transactional

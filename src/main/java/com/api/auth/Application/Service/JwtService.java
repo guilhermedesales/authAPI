@@ -11,6 +11,7 @@ import io.jsonwebtoken.security.Keys;
 import jakarta.transaction.Transactional;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 
 import java.security.Key;
@@ -23,6 +24,8 @@ import java.util.UUID;
 @Service
 public class JwtService {
 
+    public record RefreshRotationResult(Usuario usuario, String refreshToken) {}
+
     @Value("${JWT_SECRET}")
     private String secret;
 
@@ -33,9 +36,11 @@ public class JwtService {
     private Long refreshTokenDurationMs;
 
     private final RefreshTokenRepository refreshTokenRepository;
+    private final PasswordEncoder encoder;
 
-    public JwtService(RefreshTokenRepository refreshTokenRepository) {
+    public JwtService(RefreshTokenRepository refreshTokenRepository, PasswordEncoder encoder) {
         this.refreshTokenRepository = refreshTokenRepository;
+        this.encoder = encoder;
     }
 
     private Key getSignKey() {
@@ -86,18 +91,25 @@ public class JwtService {
     ///////// REFRESH TOKEN ///////////
 
     @Transactional
-    public RefreshToken createRefreshToken(Usuario usuario) {
+    public String createRefreshToken(Usuario usuario) {
         log.debug("[AUTH] Issuing refresh token - userId={}", usuario.getId());
 
+        String rawToken = UUID.randomUUID().toString();
+        String tokenId = UUID.randomUUID().toString(); // id publico pra busca
+        String hashToken = encoder.encode(rawToken);
+
         RefreshToken refreshToken = new RefreshToken();
+        refreshToken.setTokenId(tokenId);
         refreshToken.setUsuario(usuario);
         refreshToken.setExpiryDate(Instant.now().plusMillis(refreshTokenDurationMs));
-        refreshToken.setToken(UUID.randomUUID().toString());
+        refreshToken.setToken(hashToken);
         refreshToken.setUsed(false);
         refreshToken.setRevoked(false);
+
         refreshTokenRepository.save(refreshToken);
         log.info("[AUTH] Refresh token issued - userId={} expiresAt={}", usuario.getId(), refreshToken.getExpiryDate());
-        return refreshToken;
+
+        return tokenId + ":" + rawToken;
     }
 
     @Transactional
@@ -117,9 +129,23 @@ public class JwtService {
     }
 
     @Transactional
-    public RefreshToken rotateRefreshToken(String requestToken) {
-        RefreshToken currentToken = findByToken(requestToken)
+    public RefreshRotationResult rotateRefreshToken(String requestToken) {
+
+        String[] parts = requestToken.split(":", 2);
+        if (parts.length != 2)
+            throw new ValidationException(ErrorMessages.Recursos.REFRESH_TOKEN_NAO_ENCONTRADO);
+
+        String tokenId = parts[0];
+        String rawToken = parts[1];
+
+        RefreshToken currentToken = refreshTokenRepository.findByTokenId(tokenId)
                 .orElseThrow(() -> new ValidationException(ErrorMessages.Recursos.REFRESH_TOKEN_NAO_ENCONTRADO));
+
+        if(!encoder.matches(rawToken, currentToken.getToken())){
+            revokeAllByUsuario(currentToken.getUsuario());
+            log.error("[AUTH] Refresh token tampering detected - userId={} tokenId={}", currentToken.getUsuario().getId(), tokenId);
+            throw new ValidationException(ErrorMessages.Auth.REFRESH_TOKEN_REUSE_DETECTADO);
+        }
 
         Usuario usuario = currentToken.getUsuario();
 
@@ -135,10 +161,11 @@ public class JwtService {
         currentToken.setRevoked(true);
         refreshTokenRepository.save(currentToken);
 
-        RefreshToken rotated = createRefreshToken(usuario);
-        log.info("[AUTH] Refresh token rotated - userId={} oldTokenId={} newTokenId={}",
-                usuario.getId(), currentToken.getId(), rotated.getId());
-        return rotated;
+        String newRawToken = createRefreshToken(usuario);
+        log.info("[AUTH] Refresh token rotated - userId={} oldTokenId={}",
+                usuario.getId(), currentToken.getId());
+
+        return new RefreshRotationResult(usuario, newRawToken);
     }
 
     public void deleteByUsuario(Usuario usuario) {
