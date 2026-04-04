@@ -9,6 +9,7 @@ public final class ErrorMessages {
         public static final String SESSAO_EXPIRADA = "Sua sessão expirou. Faça login novamente.";
         public static final String REFRESH_TOKEN_REUSE_DETECTADO = "Reutilização de refresh token detectada. Esta sessão foi encerrada por segurança.";
         public static final String EMAIL_JA_CADASTRADO = "Esse email já possui uma conta cadastrada";
+        public static final String RATE_LIMIT_EXCEDIDO = "Muitas tentativas. Tente novamente em alguns instantes.";
     }
 
     public static class Senha {

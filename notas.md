@@ -29,7 +29,6 @@
 - [x] validação de email com código
 - [x] bloqueio por tentativas de login
 - [x] detectar uso de refresh inválido (revogar sessões)
-- [ ] invalidar sessão dps de mudar senha
 - [ ] rate limit por ip para login, esqueci senha, etc
 
 ### 🔑 Senha
@@ -44,7 +43,7 @@
 ### 🚪 Sessão
 - [x] logout (invalidar refresh token)
 - [x] sessão por device (ip, pc/celular, localização)
-- [ ] get sessão por user com filtros de busca por location, device
+- [x] get sessão por user com filtros de busca por location, device
 - [ ] invalidar sessões ativas depois de trocar senha (no fluxo de "alterar senha" e "esqueci senha")
 - [x] logout invalida apenas a sessão atual
 
@@ -113,5 +112,7 @@
     - logout por sessão (invalida apenas a sessão atual)
 
     - add get device por user
+
+    - add rate limit por ip para (login: 10 req / 60s, verify-code: 6 req / 600s, forgot-password request: 5 req / 900s, forgot-password verify: 8 req / 600s, refresh: 30 req / 60s
 
     

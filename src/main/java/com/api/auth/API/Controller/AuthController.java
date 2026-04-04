@@ -18,6 +18,7 @@ import com.api.auth.Application.Service.AuthService;
 import com.api.auth.Application.Service.JwtService;
 import com.api.auth.Application.Utils.ErrorMessages;
 import com.api.auth.Application.Utils.LogSanitizer;
+import com.api.auth.API.Config.ClientIpResolver;
 import com.api.auth.Domain.Entities.Usuario;
 import com.api.auth.Domain.Entities.UsuarioSistema;
 import com.api.auth.Infra.Repositories.UsuarioSistemaRepository;
@@ -41,11 +42,16 @@ public class AuthController {
     private final AuthService authService;
     private final JwtService jwtService;
     private final UsuarioSistemaRepository usuarioSistemaRepository;
+    private final ClientIpResolver clientIpResolver;
 
-    public AuthController(AuthService authService, JwtService jwtService, UsuarioSistemaRepository usuarioSistemaRepository) {
+    public AuthController(AuthService authService,
+                          JwtService jwtService,
+                          UsuarioSistemaRepository usuarioSistemaRepository,
+                          ClientIpResolver clientIpResolver) {
         this.authService = authService;
         this.jwtService = jwtService;
         this.usuarioSistemaRepository = usuarioSistemaRepository;
+        this.clientIpResolver = clientIpResolver;
     }
 
     @PostMapping("/register")
@@ -136,45 +142,8 @@ public class AuthController {
 
     private RequestContext buildRequestContext(HttpServletRequest request) {
         RequestContext context = new RequestContext();
-        context.setIp(extractClientIp(request));
+        context.setIp(clientIpResolver.resolve(request));
         context.setUserAgent(request.getHeader("User-Agent"));
         return context;
-    }
-
-    private String extractClientIp(HttpServletRequest request) {
-        String[] headers = {
-                "X-Forwarded-For",
-                "X-Real-IP",
-                "CF-Connecting-IP", // Cloudflare
-                "True-Client-IP"
-        };
-
-        for (String header : headers) {
-            String ip = request.getHeader(header);
-            if (ip != null && !ip.isBlank()) {
-                // pega o primeiro IP se tiver vários
-                if (ip.contains(",")) {
-                    ip = ip.split(",")[0].trim();
-                }
-                return normalizeIp(ip);
-            }
-        }
-
-        return normalizeIp(request.getRemoteAddr());
-    }
-
-    private String normalizeIp(String ip) {
-        if (ip == null) return null;
-
-        if (ip.equals("0:0:0:0:0:0:0:1") || ip.equals("::1")) {
-            return "127.0.0.1";
-        }
-
-        // remove prefixo IPv6 tipo ::ffff:127.0.0.1
-        if (ip.startsWith("::ffff:")) {
-            return ip.substring(7);
-        }
-
-        return ip;
     }
 }
