@@ -25,7 +25,7 @@ import java.util.UUID;
 @Service
 public class JwtService {
 
-    public record RefreshRotationResult(Usuario usuario, String refreshToken) {}
+    public record RefreshRotationResult(Usuario usuario, UserSession session, String refreshToken) {}
 
     @Value("${JWT_SECRET}")
     private String secret;
@@ -51,9 +51,13 @@ public class JwtService {
     }
 
     public String generateToken(UsuarioSistema usuarioSistema) {
+        return generateToken(usuarioSistema, null);
+    }
+
+    public String generateToken(UsuarioSistema usuarioSistema, UserSession session) {
 
         Usuario usuario = usuarioSistema.getUsuario();
-        String token = Jwts.builder()
+        JwtBuilder builder = Jwts.builder()
 
                 .setSubject(usuario.getId().toString()) // id do user
                 .claim("nome", usuario.getNome()) // nome do user
@@ -65,7 +69,13 @@ public class JwtService {
                 .claim("roleNome", usuarioSistema.getRole().getNome()) // nome da role
 
                 .setIssuedAt(new Date())
-                .setExpiration(new Date(System.currentTimeMillis() + expiration))
+                .setExpiration(new Date(System.currentTimeMillis() + expiration));
+
+        if (session != null) {
+            builder.claim("sessionId", session.getId().toString());
+        }
+
+        String token = builder
                 .signWith(getSignKey(), SignatureAlgorithm.HS256)
                 .compact();
 
@@ -185,7 +195,7 @@ public class JwtService {
         log.info("[AUTH] Refresh token rotated - userId={} oldTokenId={} sessionId={}",
                 usuario.getId(), currentToken.getId(), session.getId());
 
-        return new RefreshRotationResult(usuario, newRawToken);
+        return new RefreshRotationResult(usuario, session, newRawToken);
     }
 
     //public void deleteByUsuario(Usuario usuario) {

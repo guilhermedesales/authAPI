@@ -22,6 +22,7 @@ import com.api.auth.Infra.Repositories.UserSessionRepository;
 import com.api.auth.Infra.Repositories.UsuarioRepository;
 import com.api.auth.Infra.Repositories.UsuarioSistemaRepository;
 import eu.bitwalker.useragentutils.UserAgent;
+import io.jsonwebtoken.Claims;
 import jakarta.transaction.Transactional;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -143,7 +144,7 @@ public class AuthService {
 
         UserSession session = resolveOrCreateSession(usuario, requestedDeviceId, context);
 
-        String accessToken = jwtService.generateToken(usuarioSistema);
+        String accessToken = jwtService.generateToken(usuarioSistema, session);
         String refreshToken = jwtService.createRefreshToken(usuario, session);
 
         log.info("[AUTH] Login success - userId={} sessionId={}", usuario.getId(), session.getId());
@@ -248,8 +249,8 @@ public class AuthService {
         UsuarioSistema usuarioSistema = usuarioSistemaRepository.findByUsuarioAndSistema(usuario, sistema)
                 .orElseThrow(() -> new NotFoundException(ErrorMessages.Recursos.USUARIO_NAO_ENCONTRADO_SISTEMA));
 
-        String accessToken = jwtService.generateToken(usuarioSistema);
         UserSession session = createSession(usuario, context, context != null ? context.getDeviceId() : null);
+        String accessToken = jwtService.generateToken(usuarioSistema, session);
         String refreshToken = jwtService.createRefreshToken(usuario, session);
 
         log.info("[AUTH] Forgot-password confirmation success - userId={} sistemaId={}", usuario.getId(), sistema.getId());
@@ -257,16 +258,40 @@ public class AuthService {
     }
 
     @Transactional
-    public void logout() {
+    public void logout(String authorizationHeader) {
         Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
         String usuarioId = (String) authentication.getPrincipal();
         log.info("[AUTH] Logout requested - userId={}", usuarioId);
 
-        Usuario usuario = usuarioRepository.findById(UUID.fromString(usuarioId))
-                .orElseThrow(() -> new NotFoundException(ErrorMessages.Recursos.USUARIO_NAO_ENCONTRADO));
+        String token = extractBearerToken(authorizationHeader);
+        Claims claims = jwtService.extractClaims(token);
+        String sessionIdClaim = claims.get("sessionId", String.class);
 
-        refreshTokenService.revokeAllByUsuario(usuario);
-        log.info("[AUTH] Logout success - all refresh tokens revoked - userId={}", usuarioId);
+        if (sessionIdClaim == null || sessionIdClaim.isBlank()) {
+            Usuario usuario = usuarioRepository.findById(UUID.fromString(usuarioId))
+                    .orElseThrow(() -> new NotFoundException(ErrorMessages.Recursos.USUARIO_NAO_ENCONTRADO));
+            refreshTokenService.revokeAllByUsuario(usuario);
+            log.warn("[AUTH] Logout fallback for legacy token - userId={} action=revoke_all", usuarioId);
+            return;
+        }
+
+        UUID sessionId = UUID.fromString(sessionIdClaim);
+        UserSession session = userSessionRepository.findById(sessionId)
+                .orElseThrow(() -> new ValidationException(ErrorMessages.Auth.SESSAO_EXPIRADA));
+
+        if (!session.getUsuario().getId().toString().equals(usuarioId)) {
+            throw new ValidationException(ErrorMessages.Auth.SESSAO_EXPIRADA);
+        }
+
+        refreshTokenService.revokeBySession(session);
+        log.info("[AUTH] Logout success - session revoked - userId={} sessionId={}", usuarioId, sessionId);
+    }
+
+    private String extractBearerToken(String authorizationHeader) {
+        if (authorizationHeader == null || !authorizationHeader.startsWith("Bearer ")) {
+            throw new ValidationException(ErrorMessages.Auth.SESSAO_EXPIRADA);
+        }
+        return authorizationHeader.substring(7);
     }
 
     /////// utilitários /////////

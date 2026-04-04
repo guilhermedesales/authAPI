@@ -87,7 +87,7 @@ public class AuthController {
                 .findByUsuario(usuario)
                 .orElseThrow(() -> new NotFoundException(ErrorMessages.Recursos.SISTEMA_NAO_ENCONTRADO));
 
-        String accessToken = jwtService.generateToken(usuarioSistema);
+        String accessToken = jwtService.generateToken(usuarioSistema, rotationResult.session());
         log.info("[AUTH] Refresh token success - userId={}", usuario.getId());
         return ResponseEntity.ok(new RefreshTokenResponseDTO(accessToken, rotationResult.refreshToken()));
     }
@@ -110,8 +110,8 @@ public class AuthController {
     }
 
     @PostMapping("/logout")
-    public ResponseEntity<Void> logout() {
-        authService.logout();
+    public ResponseEntity<Void> logout(@RequestHeader("Authorization") String authorizationHeader) {
+        authService.logout(authorizationHeader);
         return ResponseEntity.noContent().build();
     }
 
