@@ -12,18 +12,17 @@ import com.api.auth.Application.DTOs.Auth.RefreshToken.RefreshTokenResponseDTO;
 import com.api.auth.Application.DTOs.Auth.Registrar.RegistrarDTO;
 import com.api.auth.Application.DTOs.Auth.Registrar.RegistrarResponseDTO;
 import com.api.auth.Application.DTOs.Auth.VerifyCodeDTO;
+import com.api.auth.Application.DTOs.RequestContext;
 import com.api.auth.Application.Exceptions.NotFoundException;
 import com.api.auth.Application.Service.AuthService;
 import com.api.auth.Application.Service.JwtService;
-import com.api.auth.Application.Service.VerificationCodeService;
 import com.api.auth.Application.Utils.ErrorMessages;
 import com.api.auth.Application.Utils.LogSanitizer;
 import com.api.auth.Domain.Entities.Usuario;
 import com.api.auth.Domain.Entities.UsuarioSistema;
-import com.api.auth.Domain.Entities.VerificationCode;
-import com.api.auth.Domain.Enum.TipoVerificacao;
 import com.api.auth.Infra.Repositories.UsuarioSistemaRepository;
 import io.swagger.v3.oas.annotations.tags.Tag;
+import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
@@ -42,13 +41,11 @@ public class AuthController {
     private final AuthService authService;
     private final JwtService jwtService;
     private final UsuarioSistemaRepository usuarioSistemaRepository;
-    private final VerificationCodeService verificationCodeService;
 
-    public AuthController(AuthService authService, JwtService jwtService, UsuarioSistemaRepository usuarioSistemaRepository, VerificationCodeService verificationCodeService) {
+    public AuthController(AuthService authService, JwtService jwtService, UsuarioSistemaRepository usuarioSistemaRepository) {
         this.authService = authService;
         this.jwtService = jwtService;
         this.usuarioSistemaRepository = usuarioSistemaRepository;
-        this.verificationCodeService = verificationCodeService;
     }
 
     @PostMapping("/register")
@@ -68,24 +65,16 @@ public class AuthController {
     }
 
     @PostMapping("/login/verify-code")
-    public ResponseEntity<LoginResponseDTO> verifyCodeLogin(@RequestBody @Valid VerifyCodeDTO dto) {
-        log.info("[AUTH] Login code verification - codeLength={}", dto.getCode() == null ? 0 : dto.getCode().length());
-        VerificationCode verificationCode = verificationCodeService.validateCode(dto.getCode(), TipoVerificacao.LOGIN);
-        Usuario usuario = verificationCode.getUsuario();
+    public ResponseEntity<LoginResponseDTO> verifyCodeLogin(
+            @RequestBody @Valid VerifyCodeDTO dto,
+            HttpServletRequest request
+    ) {
 
-        UsuarioSistema usuarioSistema = usuarioSistemaRepository
-                .findByUsuario(usuario)
-                .orElseThrow(() -> new NotFoundException(ErrorMessages.Recursos.SISTEMA_NAO_ENCONTRADO));
-
-        String accessToken = jwtService.generateToken(usuarioSistema);
-        String refreshToken = jwtService.createRefreshToken(usuario);
-
-        log.info("[AUTH] Login success - userId={} sistemaId={}", usuario.getId(), usuarioSistema.getSistema().getId());
-        return ResponseEntity.ok(new LoginResponseDTO(accessToken, refreshToken));
+        return ResponseEntity.ok(authService.verifyCodeLogin(dto, buildRequestContext(request)));
     }
 
     @PostMapping("/refresh-token")
-    public ResponseEntity<?> refreshToken(@RequestBody RefreshTokenDTO dto) {
+    public ResponseEntity<RefreshTokenResponseDTO> refreshToken(@RequestBody RefreshTokenDTO dto) {
         log.info("[AUTH] Refresh token request received");
         String requestToken = dto.getRefreshToken();
 
@@ -139,8 +128,53 @@ public class AuthController {
     }
 
     @PostMapping("/esqueci-senha/confirm")
-    public ResponseEntity<LoginResponseDTO> esqueciSenhaConfirm(@RequestBody @Valid EsqueciSenhaConfirmDTO dto) {
-        LoginResponseDTO response = authService.confirmarEsqueciSenha(dto);
+    public ResponseEntity<LoginResponseDTO> esqueciSenhaConfirm(@RequestBody @Valid EsqueciSenhaConfirmDTO dto,
+                                                                HttpServletRequest request) {
+        LoginResponseDTO response = authService.confirmarEsqueciSenha(dto, buildRequestContext(request));
         return ResponseEntity.ok(response);
+    }
+
+    private RequestContext buildRequestContext(HttpServletRequest request) {
+        RequestContext context = new RequestContext();
+        context.setIp(extractClientIp(request));
+        context.setUserAgent(request.getHeader("User-Agent"));
+        return context;
+    }
+
+    private String extractClientIp(HttpServletRequest request) {
+        String[] headers = {
+                "X-Forwarded-For",
+                "X-Real-IP",
+                "CF-Connecting-IP", // Cloudflare
+                "True-Client-IP"
+        };
+
+        for (String header : headers) {
+            String ip = request.getHeader(header);
+            if (ip != null && !ip.isBlank()) {
+                // pega o primeiro IP se tiver vários
+                if (ip.contains(",")) {
+                    ip = ip.split(",")[0].trim();
+                }
+                return normalizeIp(ip);
+            }
+        }
+
+        return normalizeIp(request.getRemoteAddr());
+    }
+
+    private String normalizeIp(String ip) {
+        if (ip == null) return null;
+
+        if (ip.equals("0:0:0:0:0:0:0:1") || ip.equals("::1")) {
+            return "127.0.0.1";
+        }
+
+        // remove prefixo IPv6 tipo ::ffff:127.0.0.1
+        if (ip.startsWith("::ffff:")) {
+            return ip.substring(7);
+        }
+
+        return ip;
     }
 }

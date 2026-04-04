@@ -8,6 +8,8 @@ import com.api.auth.Application.DTOs.Auth.Login.LoginDTO;
 import com.api.auth.Application.DTOs.Auth.Login.LoginResponseDTO;
 import com.api.auth.Application.DTOs.Auth.Registrar.RegistrarDTO;
 import com.api.auth.Application.DTOs.Auth.Registrar.RegistrarResponseDTO;
+import com.api.auth.Application.DTOs.Auth.VerifyCodeDTO;
+import com.api.auth.Application.DTOs.RequestContext;
 import com.api.auth.Application.Exceptions.NotFoundException;
 import com.api.auth.Application.Exceptions.ValidationException;
 import com.api.auth.Application.Mapper.MappingProfile;
@@ -16,8 +18,11 @@ import com.api.auth.Application.Utils.LogSanitizer;
 import com.api.auth.Domain.Entities.*;
 import com.api.auth.Domain.Enum.TipoVerificacao;
 import com.api.auth.Infra.Repositories.SistemaRepository;
+import com.api.auth.Infra.Repositories.UserSessionRepository;
 import com.api.auth.Infra.Repositories.UsuarioRepository;
 import com.api.auth.Infra.Repositories.UsuarioSistemaRepository;
+import eu.bitwalker.useragentutils.UserAgent;
+import jakarta.servlet.http.HttpServletRequest;
 import jakarta.transaction.Transactional;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -45,9 +50,11 @@ public class AuthService {
     private final SenhaHistoricoService senhaHistoricoService;
     private final TentativasLoginService tentativasLoginService;
     private final RefreshTokenService refreshTokenService;
+    private final UserSessionRepository userSessionRepository;
+    private final GeoLocationService geoLocationService;
 
     @Autowired
-    public AuthService(UsuarioRepository usuarioRepository, JwtService jwtService, PasswordEncoder encoder, SistemaRepository sistemaRepository, UsuarioSistemaRepository usuarioSistemaRepository, MappingProfile mappingProfile, VerificationCodeService verificationCodeService, SenhaHistoricoService senhaHistoricoService, TentativasLoginService tentativasLoginService, RefreshTokenService refreshTokenService) {
+    public AuthService(UsuarioRepository usuarioRepository, JwtService jwtService, PasswordEncoder encoder, SistemaRepository sistemaRepository, UsuarioSistemaRepository usuarioSistemaRepository, MappingProfile mappingProfile, VerificationCodeService verificationCodeService, SenhaHistoricoService senhaHistoricoService, TentativasLoginService tentativasLoginService, RefreshTokenService refreshTokenService, UserSessionRepository userSessionRepository, GeoLocationService geoLocationService) {
         this.usuarioRepository = usuarioRepository;
         this.jwtService = jwtService;
         this.sistemaRepository = sistemaRepository;
@@ -58,6 +65,8 @@ public class AuthService {
         this.senhaHistoricoService = senhaHistoricoService;
         this.tentativasLoginService = tentativasLoginService;
         this.refreshTokenService = refreshTokenService;
+        this.userSessionRepository = userSessionRepository;
+        this.geoLocationService = geoLocationService;
     }
 
     public RegistrarResponseDTO registrar(RegistrarDTO dto) {
@@ -83,6 +92,7 @@ public class AuthService {
 
     @Transactional
     public void login(LoginDTO dto){
+
         String maskedEmail = LogSanitizer.maskEmail(dto.getEmail());
         log.info("[AUTH] Login validation started - email={} sistemaId={}", maskedEmail, dto.getSistemaId());
 
@@ -100,7 +110,7 @@ public class AuthService {
             throw new ValidationException("Usuário falhou em logar muitas vezes, para continuar é necessário alterar a senha");
         }
 
-        UsuarioSistema usuarioSistema = usuarioSistemaRepository.findByUsuarioAndSistema(usuario, sistema)
+        usuarioSistemaRepository.findByUsuarioAndSistema(usuario, sistema)
                 .orElseThrow(() -> new NotFoundException(ErrorMessages.Recursos.USUARIO_NAO_ENCONTRADO_SISTEMA));
 
         if(!encoder.matches(dto.getSenha(), usuario.getSenha())) {
@@ -115,6 +125,26 @@ public class AuthService {
         usuario.setBloqueadoAte(null);
         usuarioRepository.save(usuario);
         verificationCodeService.generateAndSend(usuario, TipoVerificacao.LOGIN);
+    }
+
+    @Transactional
+    public LoginResponseDTO verifyCodeLogin(VerifyCodeDTO dto, RequestContext context){
+
+        VerificationCode verificationCode = verificationCodeService.validateCode(dto.getCode(), TipoVerificacao.LOGIN);
+        Usuario usuario = verificationCode.getUsuario();
+
+        UsuarioSistema usuarioSistema = usuarioSistemaRepository
+                .findByUsuario(usuario)
+                .orElseThrow(() -> new NotFoundException(ErrorMessages.Recursos.SISTEMA_NAO_ENCONTRADO));
+
+        UserSession session = createSession(usuario, context);
+
+        String accessToken = jwtService.generateToken(usuarioSistema);
+        String refreshToken = jwtService.createRefreshToken(usuario, session);
+
+        log.info("[AUTH] Login success - userId={} sessionId={}", usuario.getId(), session.getId());
+
+        return new LoginResponseDTO(accessToken, refreshToken);
     }
 
     @Transactional
@@ -183,7 +213,7 @@ public class AuthService {
     }
 
     @Transactional
-    public LoginResponseDTO confirmarEsqueciSenha(EsqueciSenhaConfirmDTO dto) {
+    public LoginResponseDTO confirmarEsqueciSenha(EsqueciSenhaConfirmDTO dto, RequestContext context) {
         log.info("[AUTH] Forgot-password confirmation started - challengeId={}", dto.getChallengeId());
 
         if (!dto.getNovaSenha().equals(dto.getConfirmarNovaSenha())) {
@@ -215,7 +245,8 @@ public class AuthService {
                 .orElseThrow(() -> new NotFoundException(ErrorMessages.Recursos.USUARIO_NAO_ENCONTRADO_SISTEMA));
 
         String accessToken = jwtService.generateToken(usuarioSistema);
-        String refreshToken = jwtService.createRefreshToken(usuario);
+        UserSession session = createSession(usuario, context);
+        String refreshToken = jwtService.createRefreshToken(usuario, session);
 
         log.info("[AUTH] Forgot-password confirmation success - userId={} sistemaId={}", usuario.getId(), sistema.getId());
         return new LoginResponseDTO(accessToken, refreshToken);
@@ -258,4 +289,22 @@ public class AuthService {
             throw new ValidationException(erros);
     }
 
+    private String parseUserAgent(String userAgent) {
+        UserAgent agent = UserAgent.parseUserAgentString(userAgent);
+
+        String browser = agent.getBrowser().getName();
+        String os = agent.getOperatingSystem().getName();
+
+        return browser + " (" + os + ")";
+    }
+
+    private UserSession createSession(Usuario usuario, RequestContext context) {
+        UserSession session = new UserSession();
+        session.setUsuario(usuario);
+        session.setIp(context != null ? context.getIp() : null);
+        session.setDeviceName(parseUserAgent(context != null ? context.getUserAgent() : null));
+        session.setLocation(geoLocationService.getLocation(context != null ? context.getIp() : null));
+        session.setLastUsedAt(java.time.Instant.now());
+        return userSessionRepository.save(session);
+    }
 }

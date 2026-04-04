@@ -3,6 +3,7 @@ package com.api.auth.Application.Service;
 import com.api.auth.Application.Exceptions.ValidationException;
 import com.api.auth.Application.Utils.ErrorMessages;
 import com.api.auth.Domain.Entities.RefreshToken;
+import com.api.auth.Domain.Entities.UserSession;
 import com.api.auth.Domain.Entities.Usuario;
 import com.api.auth.Domain.Entities.UsuarioSistema;
 import com.api.auth.Infra.Repositories.RefreshTokenRepository;
@@ -93,8 +94,8 @@ public class JwtService {
     ///////// REFRESH TOKEN ///////////
 
     @Transactional
-    public String createRefreshToken(Usuario usuario) {
-        log.debug("[AUTH] Issuing refresh token - userId={}", usuario.getId());
+    public String createRefreshToken(Usuario usuario, UserSession session) {
+        log.debug("[AUTH] Issuing refresh token - userId={} sessionId={}", usuario.getId(), session.getId());
 
         String rawToken = UUID.randomUUID().toString();
         String tokenId = UUID.randomUUID().toString(); // id publico pra busca
@@ -103,13 +104,15 @@ public class JwtService {
         RefreshToken refreshToken = new RefreshToken();
         refreshToken.setTokenId(tokenId);
         refreshToken.setUsuario(usuario);
+        refreshToken.setSession(session);
         refreshToken.setExpiryDate(Instant.now().plusMillis(refreshTokenDurationMs));
         refreshToken.setToken(hashToken);
         refreshToken.setUsed(false);
         refreshToken.setRevoked(false);
 
         refreshTokenRepository.save(refreshToken);
-        log.info("[AUTH] Refresh token issued - userId={} expiresAt={}", usuario.getId(), refreshToken.getExpiryDate());
+        log.info("[AUTH] Refresh token issued - userId={} sessionId={} expiresAt={}",
+                usuario.getId(), session.getId(), refreshToken.getExpiryDate());
 
         return tokenId + ":" + rawToken;
     }
@@ -143,29 +146,44 @@ public class JwtService {
         RefreshToken currentToken = refreshTokenRepository.findByTokenId(tokenId)
                 .orElseThrow(() -> new ValidationException(ErrorMessages.Recursos.REFRESH_TOKEN_NAO_ENCONTRADO));
 
+        UserSession session = currentToken.getSession();
+        if (session == null) {
+            refreshTokenService.revokeAllByUsuario(currentToken.getUsuario());
+            log.error("[AUTH] Legacy refresh token without session detected - userId={} tokenId={}",
+                    currentToken.getUsuario().getId(), tokenId);
+            throw new ValidationException(ErrorMessages.Auth.SESSAO_EXPIRADA);
+        }
+
+        if (session.getRevokedAt() != null) {
+            throw new ValidationException(ErrorMessages.Auth.SESSAO_EXPIRADA);
+        }
+
         if(!encoder.matches(rawToken, currentToken.getToken())){
-            revokeAllByUsuario(currentToken.getUsuario());
-            log.error("[AUTH] Refresh token tampering detected - userId={} tokenId={}", currentToken.getUsuario().getId(), tokenId);
+            refreshTokenService.revokeBySession(session);
+            log.error("[AUTH] Refresh token tampering detected - userId={} tokenId={} sessionId={}",
+                    currentToken.getUsuario().getId(), tokenId, session.getId());
             throw new ValidationException(ErrorMessages.Auth.REFRESH_TOKEN_REUSE_DETECTADO);
         }
 
         Usuario usuario = currentToken.getUsuario();
 
         if (currentToken.isUsed() || currentToken.isRevoked()) {
-            log.error("[AUTH] Refresh token reuse detected - userId={} tokenId={}", usuario.getId(), currentToken.getId());
-            refreshTokenService.revokeAllByUsuario(usuario);
+            log.error("[AUTH] Refresh token reuse detected - userId={} tokenId={} sessionId={}",
+                    usuario.getId(), currentToken.getId(), session.getId());
+            refreshTokenService.revokeBySession(session);
             throw new ValidationException(ErrorMessages.Auth.REFRESH_TOKEN_REUSE_DETECTADO);
         }
 
         verifyExpiration(currentToken);
 
         currentToken.setUsed(true);
-        //currentToken.setRevoked(true);
+        currentToken.setRevoked(true);
+        session.setLastUsedAt(Instant.now());
         refreshTokenRepository.save(currentToken);
 
-        String newRawToken = createRefreshToken(usuario);
-        log.info("[AUTH] Refresh token rotated - userId={} oldTokenId={}",
-                usuario.getId(), currentToken.getId());
+        String newRawToken = createRefreshToken(usuario, session);
+        log.info("[AUTH] Refresh token rotated - userId={} oldTokenId={} sessionId={}",
+                usuario.getId(), currentToken.getId(), session.getId());
 
         return new RefreshRotationResult(usuario, newRawToken);
     }
@@ -174,11 +192,6 @@ public class JwtService {
     //    revokeAllByUsuario(usuario);
     //}
 
-    @Transactional(Transactional.TxType.REQUIRES_NEW)
-    public void revokeAllByUsuario(Usuario usuario) {
-        int total = refreshTokenRepository.revokeAllByUsuarioId(usuario.getId());
-        log.info("[AUTH] Refresh tokens revoked - userId={} total={}", usuario.getId(), total);
-    }
 
     @Transactional
     public int deleteExpiredTokens() {

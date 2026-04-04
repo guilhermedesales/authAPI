@@ -30,6 +30,10 @@ public class RefreshToken {
     @JoinColumn(name = "usuario_id", referencedColumnName = "id")
     private Usuario usuario;
 
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "session_id")
+    private UserSession session;
+
     @Column(nullable = false)
     private boolean used = false;
 

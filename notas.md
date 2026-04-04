@@ -13,12 +13,13 @@
 >- [x] Email deve ser único
 >- [x] Não permitir mudar senha para uma senha já usada antes (últimas 3–5)
 >- [x] Endpoint de logout (invalida refresh token)
->- [ ] Guardar sessão do usuário por device (ip, pc/celular, localização resumida) — usar para lógica de login suspeito
+>- [x] Guardar sessão do usuário por device (ip, pc/celular, localização resumida) — usar para lógica de login suspeito
 >- [x] Verificar se refresh inválido foi usado para tentar acessar o sistema (limpar tokens ativos)
 >- [ ] Criar um model de paginação personalizado pra substituir o padrão do spring
 >- [ ] Invalidar sessões depois de trocar senha (no fluxo de "alterar senha" e "esqueci senha")
 >- [ ] rate limit por ip para login, esqueci senha, etc
 >- [ ] Melhorar padronização de erros
+>- [ ] Add get sessão por user com filtros de busca por location, device
 
 ---
 ## Separação por contexto
@@ -98,6 +99,10 @@
 
     - salva apenas hash do refresh no banco e cria id publico pra busca
 
-    - arruma fluxo de reuso do refresh token
+    - arrumei fluxo de reuso do refresh token
+
+## 04/04/26
+
+    - add sessão por device (guarda ip, location e tipo de device) - usa o ip-api por enquanto
 
     
