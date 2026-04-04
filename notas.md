@@ -43,7 +43,10 @@
 
 ### 🚪 Sessão
 - [x] logout (invalidar refresh token)
-- [ ] sessão por device (ip, pc/celular, localização)
+- [x] sessão por device (ip, pc/celular, localização)
+- [ ] get sessão por user com filtros de busca por location, device
+- [ ] invalidar sessões ativas depois de trocar senha (no fluxo de "alterar senha" e "esqueci senha")
+- [ ] logout invalida apenas a sessão atual
 
 ### ⚠️ Erros & Infra
 - [x] exceptions + middlewares
@@ -53,7 +56,7 @@
 
 ## ⚠️ Problemas Atuais
 
-    - nada agr
+    - o mesmo device é registrado como uma nova sessão, tem q buscar antes de criar um novo
 
 
 ---

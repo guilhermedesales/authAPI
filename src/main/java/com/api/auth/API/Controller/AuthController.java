@@ -12,7 +12,7 @@ import com.api.auth.Application.DTOs.Auth.RefreshToken.RefreshTokenResponseDTO;
 import com.api.auth.Application.DTOs.Auth.Registrar.RegistrarDTO;
 import com.api.auth.Application.DTOs.Auth.Registrar.RegistrarResponseDTO;
 import com.api.auth.Application.DTOs.Auth.VerifyCodeDTO;
-import com.api.auth.Application.DTOs.RequestContext;
+import com.api.auth.Application.DTOs.Auth.RequestContext;
 import com.api.auth.Application.Exceptions.NotFoundException;
 import com.api.auth.Application.Service.AuthService;
 import com.api.auth.Application.Service.JwtService;
@@ -69,8 +69,9 @@ public class AuthController {
             @RequestBody @Valid VerifyCodeDTO dto,
             HttpServletRequest request
     ) {
-
-        return ResponseEntity.ok(authService.verifyCodeLogin(dto, buildRequestContext(request)));
+        RequestContext context = buildRequestContext(request);
+        context.setDeviceId(dto.getDeviceId());
+        return ResponseEntity.ok(authService.verifyCodeLogin(dto, context));
     }
 
     @PostMapping("/refresh-token")

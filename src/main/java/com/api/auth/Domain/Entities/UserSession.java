@@ -18,6 +18,8 @@ public class UserSession extends BaseEntity {
     @GeneratedValue
     private UUID id;
 
+    private UUID deviceId; // id salvo no front (local storage, cookies, etc..)
+
     @ManyToOne
     @JoinColumn(name = "usuario_id")
     private Usuario usuario;

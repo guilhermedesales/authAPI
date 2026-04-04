@@ -9,7 +9,7 @@ import com.api.auth.Application.DTOs.Auth.Login.LoginResponseDTO;
 import com.api.auth.Application.DTOs.Auth.Registrar.RegistrarDTO;
 import com.api.auth.Application.DTOs.Auth.Registrar.RegistrarResponseDTO;
 import com.api.auth.Application.DTOs.Auth.VerifyCodeDTO;
-import com.api.auth.Application.DTOs.RequestContext;
+import com.api.auth.Application.DTOs.Auth.RequestContext;
 import com.api.auth.Application.Exceptions.NotFoundException;
 import com.api.auth.Application.Exceptions.ValidationException;
 import com.api.auth.Application.Mapper.MappingProfile;
@@ -22,7 +22,6 @@ import com.api.auth.Infra.Repositories.UserSessionRepository;
 import com.api.auth.Infra.Repositories.UsuarioRepository;
 import com.api.auth.Infra.Repositories.UsuarioSistemaRepository;
 import eu.bitwalker.useragentutils.UserAgent;
-import jakarta.servlet.http.HttpServletRequest;
 import jakarta.transaction.Transactional;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -31,6 +30,7 @@ import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 
+import java.time.Instant;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
@@ -137,14 +137,18 @@ public class AuthService {
                 .findByUsuario(usuario)
                 .orElseThrow(() -> new NotFoundException(ErrorMessages.Recursos.SISTEMA_NAO_ENCONTRADO));
 
-        UserSession session = createSession(usuario, context);
+        UUID requestedDeviceId = dto.getDeviceId() != null
+                ? dto.getDeviceId()
+                : (context != null ? context.getDeviceId() : null);
+
+        UserSession session = resolveOrCreateSession(usuario, requestedDeviceId, context);
 
         String accessToken = jwtService.generateToken(usuarioSistema);
         String refreshToken = jwtService.createRefreshToken(usuario, session);
 
         log.info("[AUTH] Login success - userId={} sessionId={}", usuario.getId(), session.getId());
 
-        return new LoginResponseDTO(accessToken, refreshToken);
+        return new LoginResponseDTO(accessToken, refreshToken, session.getDeviceId());
     }
 
     @Transactional
@@ -245,11 +249,11 @@ public class AuthService {
                 .orElseThrow(() -> new NotFoundException(ErrorMessages.Recursos.USUARIO_NAO_ENCONTRADO_SISTEMA));
 
         String accessToken = jwtService.generateToken(usuarioSistema);
-        UserSession session = createSession(usuario, context);
+        UserSession session = createSession(usuario, context, context != null ? context.getDeviceId() : null);
         String refreshToken = jwtService.createRefreshToken(usuario, session);
 
         log.info("[AUTH] Forgot-password confirmation success - userId={} sistemaId={}", usuario.getId(), sistema.getId());
-        return new LoginResponseDTO(accessToken, refreshToken);
+        return new LoginResponseDTO(accessToken, refreshToken, session.getDeviceId());
     }
 
     @Transactional
@@ -290,6 +294,10 @@ public class AuthService {
     }
 
     private String parseUserAgent(String userAgent) {
+        if (userAgent == null || userAgent.isBlank()) {
+            return "Unknown";
+        }
+
         UserAgent agent = UserAgent.parseUserAgentString(userAgent);
 
         String browser = agent.getBrowser().getName();
@@ -298,13 +306,36 @@ public class AuthService {
         return browser + " (" + os + ")";
     }
 
-    private UserSession createSession(Usuario usuario, RequestContext context) {
+    private UserSession resolveOrCreateSession(Usuario usuario, UUID deviceId, RequestContext context) {
+        if (deviceId != null) {
+            UserSession existingSession = userSessionRepository
+                    .findByUsuarioIdAndDeviceIdAndRevokedAtIsNull(usuario.getId(), deviceId)
+                    .orElse(null);
+
+            if (existingSession != null) {
+                return updateSessionContext(existingSession, context);
+            }
+        }
+
+        return createSession(usuario, context, deviceId);
+    }
+
+    private UserSession createSession(Usuario usuario, RequestContext context, UUID requestedDeviceId) {
         UserSession session = new UserSession();
         session.setUsuario(usuario);
+        session.setDeviceId(requestedDeviceId != null ? requestedDeviceId : UUID.randomUUID());
         session.setIp(context != null ? context.getIp() : null);
         session.setDeviceName(parseUserAgent(context != null ? context.getUserAgent() : null));
         session.setLocation(geoLocationService.getLocation(context != null ? context.getIp() : null));
-        session.setLastUsedAt(java.time.Instant.now());
+        session.setLastUsedAt(Instant.now());
+        return userSessionRepository.save(session);
+    }
+
+    private UserSession updateSessionContext(UserSession session, RequestContext context) {
+        session.setIp(context != null ? context.getIp() : session.getIp());
+        session.setDeviceName(parseUserAgent(context != null ? context.getUserAgent() : null));
+        session.setLocation(geoLocationService.getLocation(context != null ? context.getIp() : null));
+        session.setLastUsedAt(Instant.now());
         return userSessionRepository.save(session);
     }
 }

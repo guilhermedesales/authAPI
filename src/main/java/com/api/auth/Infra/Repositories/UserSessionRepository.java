@@ -8,6 +8,7 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
 import java.time.Instant;
+import java.util.Optional;
 import java.util.UUID;
 
 public interface UserSessionRepository extends JpaRepository<UserSession, UUID> {
@@ -29,4 +30,6 @@ public interface UserSessionRepository extends JpaRepository<UserSession, UUID> 
 		WHERE us.usuario.id = :usuarioId AND us.revokedAt IS NULL
 	""")
 	int revokeAllByUsuarioId(@Param("usuarioId") UUID usuarioId, @Param("now") Instant now);
+
+	Optional<UserSession> findByUsuarioIdAndDeviceIdAndRevokedAtIsNull(UUID usuarioId, UUID deviceId);
 }

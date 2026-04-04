@@ -28,14 +28,14 @@ public interface RefreshTokenRepository extends JpaRepository<RefreshToken, UUID
     """)
     int revokeAllByUsuarioId(@Param("usuarioId") UUID usuarioId);
 
-            @Modifying(clearAutomatically = true)
-            @Transactional
-            @Query("""
-                UPDATE RefreshToken rt
-                SET rt.revoked = true
-                WHERE rt.session.id = :sessionId AND rt.revoked = false
-            """)
-            int revokeAllBySessionId(@Param("sessionId") UUID sessionId);
+    @Modifying(clearAutomatically = true)
+    @Transactional
+    @Query("""
+        UPDATE RefreshToken rt
+        SET rt.revoked = true
+        WHERE rt.session.id = :sessionId AND rt.revoked = false
+    """)
+    int revokeAllBySessionId(@Param("sessionId") UUID sessionId);
 
     Optional<RefreshToken> findByTokenId(String tokenId);
 
