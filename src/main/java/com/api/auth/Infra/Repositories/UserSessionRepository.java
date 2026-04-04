@@ -1,7 +1,10 @@
 package com.api.auth.Infra.Repositories;
 
+import com.api.auth.Domain.Entities.Sistema;
 import com.api.auth.Domain.Entities.UserSession;
 import jakarta.transaction.Transactional;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
@@ -32,4 +35,6 @@ public interface UserSessionRepository extends JpaRepository<UserSession, UUID> 
 	int revokeAllByUsuarioId(@Param("usuarioId") UUID usuarioId, @Param("now") Instant now);
 
 	Optional<UserSession> findByUsuarioIdAndDeviceIdAndRevokedAtIsNull(UUID usuarioId, UUID deviceId);
+
+    Page<UserSession> findAllByUsuarioId(UUID usuarioId, Pageable pageable);
 }

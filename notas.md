@@ -46,7 +46,7 @@
 - [x] sessão por device (ip, pc/celular, localização)
 - [ ] get sessão por user com filtros de busca por location, device
 - [ ] invalidar sessões ativas depois de trocar senha (no fluxo de "alterar senha" e "esqueci senha")
-- [ ] logout invalida apenas a sessão atual
+- [x] logout invalida apenas a sessão atual
 
 ### ⚠️ Erros & Infra
 - [x] exceptions + middlewares
@@ -56,7 +56,7 @@
 
 ## ⚠️ Problemas Atuais
 
-    - o mesmo device é registrado como uma nova sessão, tem q buscar antes de criar um novo
+    - ---
 
 
 ---
@@ -107,5 +107,11 @@
 ## 04/04/26
 
     - add sessão por device (guarda ip, location e tipo de device) - usa o ip-api por enquanto
+
+    - add device id para identificar se é o mesmo device ou não
+
+    - logout por sessão (invalida apenas a sessão atual)
+
+    - add get device por user
 
     

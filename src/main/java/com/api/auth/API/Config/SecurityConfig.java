@@ -35,7 +35,8 @@ public class SecurityConfig {
                         .requestMatchers(
                                 "/health/validateJWT",
                                 "/auth/logout",
-                                "/auth/alterar-senha"
+                                "/auth/alterar-senha",
+                                "/user-device/**"
                         ).authenticated()
                         .anyRequest().permitAll()
                 )

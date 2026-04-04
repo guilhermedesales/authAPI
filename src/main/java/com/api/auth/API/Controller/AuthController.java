@@ -129,8 +129,7 @@ public class AuthController {
     }
 
     @PostMapping("/esqueci-senha/confirm")
-    public ResponseEntity<LoginResponseDTO> esqueciSenhaConfirm(@RequestBody @Valid EsqueciSenhaConfirmDTO dto,
-                                                                HttpServletRequest request) {
+    public ResponseEntity<LoginResponseDTO> esqueciSenhaConfirm(@RequestBody @Valid EsqueciSenhaConfirmDTO dto, HttpServletRequest request) {
         LoginResponseDTO response = authService.confirmarEsqueciSenha(dto, buildRequestContext(request));
         return ResponseEntity.ok(response);
     }

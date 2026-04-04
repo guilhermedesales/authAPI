@@ -8,6 +8,7 @@ import com.api.auth.Application.DTOs.Role.RoleListDTO;
 import com.api.auth.Application.DTOs.Role.RoleResumoDTO;
 import com.api.auth.Application.DTOs.Sistema.SistemaDTO;
 import com.api.auth.Application.DTOs.Sistema.SistemaListDTO;
+import com.api.auth.Application.DTOs.UserDevice.UserDeviceDTO;
 import com.api.auth.Application.DTOs.UsuarioSistema.CriarUsuarioSistemaDTO;
 import com.api.auth.Application.DTOs.UsuarioSistema.UsuarioSistemaDTO;
 import com.api.auth.Domain.Entities.*;
@@ -71,4 +72,8 @@ public interface MappingProfile {
     @Mapping(source = "createdAt", target = "createdAt")
     @Mapping(source = "updatedAt", target = "updatedAt")
     RegistrarResponseDTO toDTO(Usuario usuario);
+
+    /////////// USER DEVICE ////////
+
+    UserDeviceDTO toDTO(UserSession userSession);
 }
