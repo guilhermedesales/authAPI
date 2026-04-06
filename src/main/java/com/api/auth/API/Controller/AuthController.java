@@ -7,6 +7,7 @@ import com.api.auth.Application.DTOs.Auth.EsqueciSenha.EsqueciSenhaVerifyCodeDTO
 import com.api.auth.Application.DTOs.Auth.EsqueciSenha.EsqueciSenhaVerifyResponseDTO;
 import com.api.auth.Application.DTOs.Auth.Login.LoginDTO;
 import com.api.auth.Application.DTOs.Auth.Login.LoginResponseDTO;
+import com.api.auth.Application.DTOs.Auth.OtpChallengeResponseDTO;
 import com.api.auth.Application.DTOs.Auth.RefreshToken.RefreshTokenDTO;
 import com.api.auth.Application.DTOs.Auth.RefreshToken.RefreshTokenResponseDTO;
 import com.api.auth.Application.DTOs.Auth.Registrar.RegistrarDTO;
@@ -63,11 +64,11 @@ public class AuthController {
     }
 
     @PostMapping("/login")
-    public ResponseEntity<Void> login(@Valid @RequestBody LoginDTO dto) {
+    public ResponseEntity<OtpChallengeResponseDTO> login(@Valid @RequestBody LoginDTO dto) {
         log.info("[AUTH] Login attempt - email={} sistemaId={}", LogSanitizer.maskEmail(dto.getEmail()), dto.getSistemaId());
-        authService.login(dto);
+        UUID challengeId = authService.login(dto);
         log.info("[AUTH] Login challenge sent - email={}", LogSanitizer.maskEmail(dto.getEmail()));
-        return ResponseEntity.noContent().build(); // 204
+        return ResponseEntity.ok(new OtpChallengeResponseDTO(challengeId));
     }
 
     @PostMapping("/login/verify-code")
@@ -88,10 +89,13 @@ public class AuthController {
         // Service performs reuse detection + rotation in a single transaction.
         JwtService.RefreshRotationResult rotationResult = jwtService.rotateRefreshToken(requestToken);
         Usuario usuario = rotationResult.usuario();
+        if (rotationResult.session().getSistema() == null) {
+            throw new NotFoundException(ErrorMessages.Recursos.SISTEMA_NAO_ENCONTRADO);
+        }
 
         UsuarioSistema usuarioSistema = usuarioSistemaRepository
-                .findByUsuario(usuario)
-                .orElseThrow(() -> new NotFoundException(ErrorMessages.Recursos.SISTEMA_NAO_ENCONTRADO));
+                .findByUsuarioAndSistema(usuario, rotationResult.session().getSistema())
+                .orElseThrow(() -> new NotFoundException(ErrorMessages.Recursos.USUARIO_NAO_ENCONTRADO_SISTEMA));
 
         String accessToken = jwtService.generateToken(usuarioSistema, rotationResult.session());
         log.info("[AUTH] Refresh token success - userId={}", usuario.getId());
@@ -99,18 +103,18 @@ public class AuthController {
     }
 
     @PutMapping("/alterar-senha")
-    public ResponseEntity<Void> alterarSenha(@RequestBody @Valid AlterarSenhaDTO dto,
-                                             @AuthenticationPrincipal String usuarioId) {
+    public ResponseEntity<OtpChallengeResponseDTO> alterarSenha(@RequestBody @Valid AlterarSenhaDTO dto,
+                                                                @AuthenticationPrincipal String usuarioId) {
         log.info("[AUTH] Password change request - userId={}", usuarioId);
-        authService.alterarSenha(UUID.fromString(usuarioId), dto);
+        UUID challengeId = authService.alterarSenha(UUID.fromString(usuarioId), dto);
         log.info("[AUTH] Password change challenge sent - userId={}", usuarioId);
-        return ResponseEntity.noContent().build();
+        return ResponseEntity.ok(new OtpChallengeResponseDTO(challengeId));
     }
 
     @PostMapping("/alterar-senha/verify-code")
     public ResponseEntity<Void> verifyCodeAlterarSenha(@RequestBody @Valid VerifyCodeDTO dto) {
         log.info("[AUTH] Password change code verification - codeLength={}", dto.getCode() == null ? 0 : dto.getCode().length());
-        authService.confirmarAlteracaoSenha(dto.getCode());
+        authService.confirmarAlteracaoSenha(dto.getChallengeId(), dto.getCode());
         log.info("[AUTH] Password changed successfully via verification code");
         return ResponseEntity.noContent().build();
     }

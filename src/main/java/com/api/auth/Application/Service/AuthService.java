@@ -92,7 +92,7 @@ public class AuthService {
     }
 
     @Transactional
-    public void login(LoginDTO dto){
+    public UUID login(LoginDTO dto){
 
         String maskedEmail = LogSanitizer.maskEmail(dto.getEmail());
         log.info("[AUTH] Login validation started - email={} sistemaId={}", maskedEmail, dto.getSistemaId());
@@ -125,24 +125,39 @@ public class AuthService {
         usuario.setTentativasFalhas(0);
         usuario.setBloqueadoAte(null);
         usuarioRepository.save(usuario);
-        verificationCodeService.generateAndSend(usuario, TipoVerificacao.LOGIN);
+        UUID challengeId = verificationCodeService.generateAndSendChallenge(
+                usuario,
+                TipoVerificacao.LOGIN,
+                null,
+                sistema.getId()
+        );
+        return challengeId;
     }
 
     @Transactional
     public LoginResponseDTO verifyCodeLogin(VerifyCodeDTO dto, RequestContext context){
 
-        VerificationCode verificationCode = verificationCodeService.validateCode(dto.getCode(), TipoVerificacao.LOGIN);
+        VerificationCode verificationCode = verificationCodeService
+                .validateCodeByChallenge(dto.getChallengeId(), dto.getCode(), TipoVerificacao.LOGIN);
         Usuario usuario = verificationCode.getUsuario();
 
-        UsuarioSistema usuarioSistema = usuarioSistemaRepository
-                .findByUsuario(usuario)
+        UUID sistemaId = verificationCode.getSistemaId();
+        if (sistemaId == null) {
+            throw new ValidationException(ErrorMessages.Auth.SESSAO_EXPIRADA);
+        }
+
+        Sistema sistema = sistemaRepository.findById(sistemaId)
                 .orElseThrow(() -> new NotFoundException(ErrorMessages.Recursos.SISTEMA_NAO_ENCONTRADO));
+
+        UsuarioSistema usuarioSistema = usuarioSistemaRepository
+                .findByUsuarioAndSistema(usuario, sistema)
+                .orElseThrow(() -> new NotFoundException(ErrorMessages.Recursos.USUARIO_NAO_ENCONTRADO_SISTEMA));
 
         UUID requestedDeviceId = dto.getDeviceId() != null
                 ? dto.getDeviceId()
                 : (context != null ? context.getDeviceId() : null);
 
-        UserSession session = resolveOrCreateSession(usuario, requestedDeviceId, context);
+        UserSession session = resolveOrCreateSession(usuario, sistema, requestedDeviceId, context);
 
         String accessToken = jwtService.generateToken(usuarioSistema, session);
         String refreshToken = jwtService.createRefreshToken(usuario, session);
@@ -153,7 +168,7 @@ public class AuthService {
     }
 
     @Transactional
-    public void alterarSenha(UUID usuarioId, AlterarSenhaDTO dto) {
+    public UUID alterarSenha(UUID usuarioId, AlterarSenhaDTO dto) {
         log.info("[AUTH] Password change requested - userId={}", usuarioId);
         Usuario usuario = usuarioRepository.findById(usuarioId)
                 .orElseThrow(() -> new NotFoundException(ErrorMessages.Recursos.USUARIO_NAO_ENCONTRADO));
@@ -171,15 +186,22 @@ public class AuthService {
 
         log.info("[AUTH] Password policy validated - userId={}", usuarioId);
         String novaSenhaHash = encoder.encode(dto.getNovaSenha());
-        verificationCodeService.generateAndSend(usuario, TipoVerificacao.ALTERAR_SENHA, novaSenhaHash);
+        UUID challengeId = verificationCodeService.generateAndSendChallenge(
+                usuario,
+                TipoVerificacao.ALTERAR_SENHA,
+                novaSenhaHash,
+                null
+        );
         log.info("[AUTH] Password change verification sent - userId={}", usuarioId);
+        return challengeId;
     }
 
     @Transactional
-    public void confirmarAlteracaoSenha(String code) {
+    public void confirmarAlteracaoSenha(UUID challengeId, String code) {
         log.info("[AUTH] Password change verification started");
 
-        VerificationCode verificationCode = verificationCodeService.validateCode(code, TipoVerificacao.ALTERAR_SENHA);
+        VerificationCode verificationCode = verificationCodeService
+                .validateCodeByChallenge(challengeId, code, TipoVerificacao.ALTERAR_SENHA);
         Usuario usuario = verificationCode.getUsuario();
 
         // salva a senha atual no histórico antes de trocar
@@ -249,7 +271,7 @@ public class AuthService {
         UsuarioSistema usuarioSistema = usuarioSistemaRepository.findByUsuarioAndSistema(usuario, sistema)
                 .orElseThrow(() -> new NotFoundException(ErrorMessages.Recursos.USUARIO_NAO_ENCONTRADO_SISTEMA));
 
-        UserSession session = createSession(usuario, context, context != null ? context.getDeviceId() : null);
+        UserSession session = createSession(usuario, sistema, context, context != null ? context.getDeviceId() : null);
         String accessToken = jwtService.generateToken(usuarioSistema, session);
         String refreshToken = jwtService.createRefreshToken(usuario, session);
 
@@ -331,10 +353,10 @@ public class AuthService {
         return browser + " (" + os + ")";
     }
 
-    private UserSession resolveOrCreateSession(Usuario usuario, UUID deviceId, RequestContext context) {
+    private UserSession resolveOrCreateSession(Usuario usuario, Sistema sistema, UUID deviceId, RequestContext context) {
         if (deviceId != null) {
             UserSession existingSession = userSessionRepository
-                    .findByUsuarioIdAndDeviceIdAndRevokedAtIsNull(usuario.getId(), deviceId)
+                    .findByUsuarioIdAndSistemaIdAndDeviceIdAndRevokedAtIsNull(usuario.getId(), sistema.getId(), deviceId)
                     .orElse(null);
 
             if (existingSession != null) {
@@ -342,12 +364,13 @@ public class AuthService {
             }
         }
 
-        return createSession(usuario, context, deviceId);
+        return createSession(usuario, sistema, context, deviceId);
     }
 
-    private UserSession createSession(Usuario usuario, RequestContext context, UUID requestedDeviceId) {
+    private UserSession createSession(Usuario usuario, Sistema sistema, RequestContext context, UUID requestedDeviceId) {
         UserSession session = new UserSession();
         session.setUsuario(usuario);
+        session.setSistema(sistema);
         session.setDeviceId(requestedDeviceId != null ? requestedDeviceId : UUID.randomUUID());
         session.setIp(context != null ? context.getIp() : null);
         session.setDeviceName(parseUserAgent(context != null ? context.getUserAgent() : null));

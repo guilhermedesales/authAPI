@@ -24,6 +24,10 @@ public class UserSession extends BaseEntity {
     @JoinColumn(name = "usuario_id")
     private Usuario usuario;
 
+    @ManyToOne
+    @JoinColumn(name = "sistema_id")
+    private Sistema sistema;
+
     private String ip;
 
     private String deviceName;

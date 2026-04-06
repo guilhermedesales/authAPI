@@ -115,4 +115,12 @@
 
     - add rate limit por ip para (login: 10 req / 60s, verify-code: 6 req / 600s, forgot-password request: 5 req / 900s, forgot-password verify: 8 req / 600s, refresh: 30 req / 60s
 
+## 06/04/26
+
+    - add chalengeId em todos os fluxos q possuem OTP (cod de verificação do email)
+
+    - hotfix permissao service não estava vinculando a uma role
+
+    - 
+
     

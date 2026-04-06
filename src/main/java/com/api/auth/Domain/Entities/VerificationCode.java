@@ -38,4 +38,7 @@ public class VerificationCode {
     private UUID challengeId;
     private Instant challengeExpiryDate;
     private boolean challengeUsed = false;
+
+    // Vincula challenge de login ao sistema solicitado para evitar ambiguidade multi-sistema.
+    private UUID sistemaId;
 }

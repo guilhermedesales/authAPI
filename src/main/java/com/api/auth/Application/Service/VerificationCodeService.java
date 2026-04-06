@@ -57,11 +57,74 @@ public class VerificationCodeService {
         verificationCode.setChallengeId(null);
         verificationCode.setChallengeExpiryDate(null);
         verificationCode.setChallengeUsed(false);
+        verificationCode.setSistemaId(null);
 
         verificationCodeRepository.save(verificationCode);
         emailService.sendVerificationCode(usuario.getEmail(), code);
         log.info("[AUTH] Verification code generated and sent - userId={} email={} tipo={}",
                 usuario.getId(), LogSanitizer.maskEmail(usuario.getEmail()), tipo);
+    }
+
+    @Transactional
+    public UUID generateAndSendChallenge(Usuario usuario, TipoVerificacao tipo, String novaSenhaHash, UUID sistemaId) {
+        log.info("[AUTH] Generating challenge-based verification code - userId={} tipo={} sistemaId={}",
+                usuario.getId(), tipo, sistemaId);
+        verificationCodeRepository.deleteByUsuarioAndTipo(usuario, tipo);
+        verificationCodeRepository.flush();
+
+        String code = String.format("%06d", new SecureRandom().nextInt(999999));
+        UUID challengeId = UUID.randomUUID();
+
+        VerificationCode verificationCode = new VerificationCode();
+        verificationCode.setUsuario(usuario);
+        verificationCode.setCode(code);
+        verificationCode.setExpiryDate(Instant.now().plusMillis(expirationMs));
+        verificationCode.setUsed(false);
+        verificationCode.setTipo(tipo);
+        verificationCode.setNovaSenhaHash(novaSenhaHash);
+        verificationCode.setChallengeId(challengeId);
+        verificationCode.setChallengeExpiryDate(Instant.now().plusMillis(challengeExpirationMs));
+        verificationCode.setChallengeUsed(false);
+        verificationCode.setSistemaId(sistemaId);
+
+        verificationCodeRepository.save(verificationCode);
+        emailService.sendVerificationCode(usuario.getEmail(), code);
+        log.info("[AUTH] Challenge verification code generated and sent - userId={} challengeId={} tipo={}",
+                usuario.getId(), challengeId, tipo);
+        return challengeId;
+    }
+
+    @Transactional
+    public VerificationCode validateCodeByChallenge(UUID challengeId, String code, TipoVerificacao tipoEsperado) {
+        log.info("[AUTH] Validating challenge-based verification code - tipo={} challengeId={}",
+                tipoEsperado, challengeId);
+
+        VerificationCode verificationCode = verificationCodeRepository
+                .findByChallengeIdAndCodeAndTipo(challengeId, code, tipoEsperado)
+                .orElseThrow(() -> new NotFoundException(ErrorMessages.CodigoEmail.CODIGO_INVALIDO));
+
+        if (verificationCode.isUsed() || verificationCode.isChallengeUsed()) {
+            throw new ValidationException(ErrorMessages.CodigoEmail.CODIGO_UTILIZADO);
+        }
+
+        if (verificationCode.getExpiryDate().isBefore(Instant.now()) ||
+                verificationCode.getChallengeExpiryDate() == null ||
+                verificationCode.getChallengeExpiryDate().isBefore(Instant.now())) {
+            throw new ValidationException(ErrorMessages.CodigoEmail.CODIGO_EXPIRADO);
+        }
+
+        verificationCode.setUsed(true);
+        verificationCode.setChallengeUsed(true);
+        verificationCodeRepository.save(verificationCode);
+
+        Usuario usuario = verificationCode.getUsuario();
+        if (!usuario.isEmailConfirmado()) {
+            usuario.setEmailConfirmado(true);
+            usuarioRepository.save(usuario);
+            log.info("[AUTH] Email confirmed - userId={}", usuario.getId());
+        }
+
+        return verificationCode;
     }
 
     @Transactional

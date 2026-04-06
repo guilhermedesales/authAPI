@@ -164,6 +164,13 @@ public class JwtService {
             throw new ValidationException(ErrorMessages.Auth.SESSAO_EXPIRADA);
         }
 
+        if (session.getSistema() == null) {
+            refreshTokenService.revokeBySession(session);
+            log.error("[AUTH] Legacy refresh token without sistema on session detected - userId={} tokenId={} sessionId={}",
+                    currentToken.getUsuario().getId(), tokenId, session.getId());
+            throw new ValidationException(ErrorMessages.Auth.SESSAO_EXPIRADA);
+        }
+
         if (session.getRevokedAt() != null) {
             throw new ValidationException(ErrorMessages.Auth.SESSAO_EXPIRADA);
         }

@@ -34,7 +34,7 @@ public interface UserSessionRepository extends JpaRepository<UserSession, UUID> 
 	""")
 	int revokeAllByUsuarioId(@Param("usuarioId") UUID usuarioId, @Param("now") Instant now);
 
-	Optional<UserSession> findByUsuarioIdAndDeviceIdAndRevokedAtIsNull(UUID usuarioId, UUID deviceId);
+	Optional<UserSession> findByUsuarioIdAndSistemaIdAndDeviceIdAndRevokedAtIsNull(UUID usuarioId, UUID sistemaId, UUID deviceId);
 
     Page<UserSession> findAllByUsuarioId(UUID usuarioId, Pageable pageable);
 }

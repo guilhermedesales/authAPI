@@ -15,7 +15,6 @@ import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 
-import java.util.List;
 import java.util.UUID;
 
 @Slf4j
@@ -40,6 +39,7 @@ public class PermissaoService {
         Permissao permissao = Permissao.builder()
                 .nome(dto.getNome())
                 .descricao(dto.getDescricao())
+                .role(role)
                 .build();
 
         Permissao saved = permissaoRepository.save(permissao);
@@ -58,10 +58,11 @@ public class PermissaoService {
     public PermissaoDTO editar(UUID id, CriarPermissaoDTO dto) {
         log.info("[PERMISSAO] Update started - permissaoId={} roleId={}", id, dto.getRoleId());
 
-        Permissao permissao = new Permissao();
-        permissaoRepository.findById(id)
+        Permissao permissao = permissaoRepository.findById(id)
                 .orElseThrow(()-> new NotFoundException(ErrorMessages.Recursos.PERMISSAO_NAO_ENCONTRADO));
+
         permissao.setNome(dto.getNome());
+        permissao.setDescricao(dto.getDescricao());
 
         if(dto.getRoleId() != null){
             Role role = roleRepository.findById(dto.getRoleId())
