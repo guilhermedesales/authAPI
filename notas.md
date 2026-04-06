@@ -20,8 +20,26 @@
 >- [x] rate limit por ip para login, esqueci senha, etc
 >- [ ] Melhorar padronização de erros
 >- [x] Add get sessão por user com filtros de busca por location, device
+>- [ ] Implementar autorização por role/permissão (RBAC)
+>- [ ] Adicionar roles/permissões no JWT (authorities)
+>- [ ] Proteger endpoints administrativos (sistema, role, permissao, usuarioSistema)
+>- [ ] Evitar enumeração de usuário no login (resposta padrão)
+>- [ ] Implementar revogação de access token (blacklist / Redis)
+>- [ ] Resolver race condition no refresh token
+>- [ ] Hash do OTP (não salvar código em texto puro)
+>- [ ] Melhorar rate limit (não só IP, incluir email/user/device)
+>- [ ] Limitar quantidade de sessões por usuário
+>- [ ] Criar auditoria de segurança (login, refresh, senha, logout)
+>- [ ] Criar testes de integração (login, refresh, esqueci senha)
+>- [ ] Adicionar @Version nas entidades críticas
+>- [ ] Melhorar modelagem (índices e constraints)
+>- [ ] Criar limpeza automática (OTP, refresh, sessões)
+>- [ ] Melhorar logs pensando no front
+>- [ ] Implementar 2FA (Google Authenticator / TOTP)
+>- [ ] Login com Google (OAuth2)
 
 ---
+
 ## Separação por contexto
 
 ### 🔐 Segurança
@@ -30,6 +48,13 @@
 - [x] bloqueio por tentativas de login
 - [x] detectar uso de refresh inválido (revogar sessões)
 - [ ] rate limit por ip para login, esqueci senha, etc
+- [ ] autorização por role/permissão (RBAC)
+- [ ] roles/permissões no JWT (authorities)
+- [ ] proteção de endpoints administrativos
+- [ ] evitar enumeração de usuário no login
+- [ ] revogação de access token
+- [ ] hash de OTP
+- [ ] auditoria de segurança
 
 ### 🔑 Senha
 - [x] padrão forte
@@ -46,19 +71,27 @@
 - [x] get sessão por user com filtros de busca por location, device
 - [ ] invalidar sessões ativas depois de trocar senha (no fluxo de "alterar senha" e "esqueci senha")
 - [x] logout invalida apenas a sessão atual
+- [ ] limitar sessões por usuário
 
 ### ⚠️ Erros & Infra
 - [x] exceptions + middlewares
 - [ ] melhorar padronização
+- [ ] testes de integração
 
 ---
 
 ## ⚠️ Problemas Atuais
 
-    - ---
-
+    - JWT sem authorities (sem autorização real)
+    - Endpoints administrativos sem proteção
+    - OTP salvo em texto puro
+    - Race condition no refresh token
+    - Falta revogação de access token
+    - Enumeração de usuário no login
+    - Rate limit apenas por IP (fraco contra botnet)
 
 ---
+
 
 # HISTÓRICO DE DESENVOLVIMENTO 
 
@@ -128,5 +161,7 @@
     - retry no geolocation
 
     - add score de risco no login para ip, endereço e device
+
+    - add documentação no swagger
 
     
