@@ -38,6 +38,7 @@ public final class ErrorMessages {
         public static final String CODIGO_INVALIDO = "Código Inválido";
         public static final String CODIGO_UTILIZADO = "Código já utilizado.";
         public static final String CODIGO_EXPIRADO = "Código expirado.";
+        public static final String CODIGO_TENTATIVAS_EXCEDIDAS = "Limite de tentativas do código excedido. Solicite um novo código.";
     }
 
 }

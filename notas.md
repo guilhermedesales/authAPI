@@ -16,10 +16,10 @@
 >- [x] Guardar sessão do usuário por device (ip, pc/celular, localização resumida) — usar para lógica de login suspeito
 >- [x] Verificar se refresh inválido foi usado para tentar acessar o sistema (limpar tokens ativos)
 >- [ ] Criar um model de paginação personalizado pra substituir o padrão do spring
->- [ ] Invalidar sessões depois de trocar senha (no fluxo de "alterar senha" e "esqueci senha")
->- [ ] rate limit por ip para login, esqueci senha, etc
+>- [x] Invalidar sessões depois de trocar senha (no fluxo de "alterar senha" e "esqueci senha")
+>- [x] rate limit por ip para login, esqueci senha, etc
 >- [ ] Melhorar padronização de erros
->- [ ] Add get sessão por user com filtros de busca por location, device
+>- [x] Add get sessão por user com filtros de busca por location, device
 
 ---
 ## Separação por contexto
@@ -117,7 +117,7 @@
 
 ## 06/04/26
 
-    - add chalengeId em todos os fluxos q possuem OTP (cod de verificação do email)
+    - add challengeId em todos os fluxos q possuem OTP (cod de verificação do email)
 
     - hotfix permissao service não estava vinculando a uma role
 

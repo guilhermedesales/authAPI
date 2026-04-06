@@ -14,10 +14,6 @@ import org.springframework.stereotype.Component;
 import org.springframework.web.filter.OncePerRequestFilter;
 
 import java.io.IOException;
-import java.util.ArrayDeque;
-import java.util.Deque;
-import java.util.Map;
-import java.util.concurrent.ConcurrentHashMap;
 
 @Slf4j
 @Component
@@ -25,7 +21,7 @@ public class AuthRateLimitFilter extends OncePerRequestFilter {
 
     private final ClientIpResolver clientIpResolver;
     private final ObjectMapper objectMapper;
-    private final Map<String, SlidingWindow> counters = new ConcurrentHashMap<>();
+    private final RedisSlidingWindowRateLimiter rateLimiter;
 
     @Value("${auth.rate-limit.enabled:true}")
     private boolean enabled;
@@ -60,9 +56,12 @@ public class AuthRateLimitFilter extends OncePerRequestFilter {
     @Value("${auth.rate-limit.refresh.window-seconds:60}")
     private long refreshWindowSeconds;
 
-    public AuthRateLimitFilter(ClientIpResolver clientIpResolver, ObjectMapper objectMapper) {
+    public AuthRateLimitFilter(ClientIpResolver clientIpResolver,
+                               ObjectMapper objectMapper,
+                               RedisSlidingWindowRateLimiter rateLimiter) {
         this.clientIpResolver = clientIpResolver;
         this.objectMapper = objectMapper;
+        this.rateLimiter = rateLimiter;
     }
 
     @Override
@@ -86,12 +85,7 @@ public class AuthRateLimitFilter extends OncePerRequestFilter {
             clientIp = "unknown";
         }
 
-        String key = rule.ruleName + ":" + clientIp;
-        long now = System.currentTimeMillis();
-        long windowMs = rule.windowSeconds * 1000L;
-
-        SlidingWindow window = counters.computeIfAbsent(key, ignored -> new SlidingWindow());
-        long retryAfterSeconds = window.tryAcquire(now, windowMs, rule.maxAttempts);
+        long retryAfterSeconds = rateLimiter.tryAcquire(rule.ruleName, clientIp, rule.maxAttempts, rule.windowSeconds);
         if (retryAfterSeconds >= 0) {
             log.warn("[RATE LIMIT] Blocked request - rule={} ip={} uri={} method={} retryAfterSec={}",
                     rule.ruleName, clientIp, request.getRequestURI(), request.getMethod(), retryAfterSeconds);
@@ -135,25 +129,5 @@ public class AuthRateLimitFilter extends OncePerRequestFilter {
     }
 
     private record RateLimitRule(String ruleName, int maxAttempts, long windowSeconds) {
-    }
-
-    private static final class SlidingWindow {
-
-        private final Deque<Long> requests = new ArrayDeque<>();
-
-        synchronized long tryAcquire(long nowMs, long windowMs, int maxAttempts) {
-            while (!requests.isEmpty() && nowMs - requests.peekFirst() >= windowMs) {
-                requests.pollFirst();
-            }
-
-            if (requests.size() >= maxAttempts) {
-                long oldest = requests.peekFirst();
-                long retryAfterMs = (oldest + windowMs) - nowMs;
-                return Math.max(1L, (long) Math.ceil(retryAfterMs / 1000.0));
-            }
-
-            requests.addLast(nowMs);
-            return -1L;
-        }
     }
 }

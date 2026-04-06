@@ -29,6 +29,8 @@ public class VerificationCode {
     @Column(nullable = false)
     private boolean used = false;
 
+    private Integer attempts = 0;
+
     @Enumerated(EnumType.STRING)
     private TipoVerificacao tipo; // LOGIN, ALTERAR_SENHA, etc
 

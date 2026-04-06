@@ -34,6 +34,9 @@ public class VerificationCodeService {
     @Value("${VERIFICATION_CHALLENGE_EXPIRATION:600000}")
     private long challengeExpirationMs;
 
+    @Value("${auth.otp.max-attempts:5}")
+    private int otpMaxAttempts;
+
     @Transactional
     public void generateAndSend(Usuario usuario, TipoVerificacao tipo) {
         generateAndSend(usuario, tipo, null);
@@ -58,6 +61,7 @@ public class VerificationCodeService {
         verificationCode.setChallengeExpiryDate(null);
         verificationCode.setChallengeUsed(false);
         verificationCode.setSistemaId(null);
+        verificationCode.setAttempts(0);
 
         verificationCodeRepository.save(verificationCode);
         emailService.sendVerificationCode(usuario.getEmail(), code);
@@ -86,6 +90,7 @@ public class VerificationCodeService {
         verificationCode.setChallengeExpiryDate(Instant.now().plusMillis(challengeExpirationMs));
         verificationCode.setChallengeUsed(false);
         verificationCode.setSistemaId(sistemaId);
+        verificationCode.setAttempts(0);
 
         verificationCodeRepository.save(verificationCode);
         emailService.sendVerificationCode(usuario.getEmail(), code);
@@ -100,7 +105,7 @@ public class VerificationCodeService {
                 tipoEsperado, challengeId);
 
         VerificationCode verificationCode = verificationCodeRepository
-                .findByChallengeIdAndCodeAndTipo(challengeId, code, tipoEsperado)
+                .findByChallengeIdAndTipo(challengeId, tipoEsperado)
                 .orElseThrow(() -> new NotFoundException(ErrorMessages.CodigoEmail.CODIGO_INVALIDO));
 
         if (verificationCode.isUsed() || verificationCode.isChallengeUsed()) {
@@ -111,6 +116,11 @@ public class VerificationCodeService {
                 verificationCode.getChallengeExpiryDate() == null ||
                 verificationCode.getChallengeExpiryDate().isBefore(Instant.now())) {
             throw new ValidationException(ErrorMessages.CodigoEmail.CODIGO_EXPIRADO);
+        }
+
+        if (!verificationCode.getCode().equals(code)) {
+            registerFailedAttempt(verificationCode, true);
+            throw new ValidationException(ErrorMessages.CodigoEmail.CODIGO_INVALIDO);
         }
 
         verificationCode.setUsed(true);
@@ -172,7 +182,7 @@ public class VerificationCodeService {
         log.info("[AUTH] Validating forgot-password code - email={}", maskedEmail);
 
         VerificationCode verificationCode = verificationCodeRepository
-                .findByCodeAndUsuarioEmailAndTipo(code, email, TipoVerificacao.ESQUECI_SENHA)
+                .findTopByUsuarioEmailAndTipoAndUsedFalseOrderByExpiryDateDesc(email, TipoVerificacao.ESQUECI_SENHA)
                 .orElseThrow(() -> new NotFoundException(ErrorMessages.CodigoEmail.CODIGO_INVALIDO));
 
         if (verificationCode.isUsed()) {
@@ -181,6 +191,11 @@ public class VerificationCodeService {
 
         if (verificationCode.getExpiryDate().isBefore(Instant.now())) {
             throw new ValidationException(ErrorMessages.CodigoEmail.CODIGO_EXPIRADO);
+        }
+
+        if (!verificationCode.getCode().equals(code)) {
+            registerFailedAttempt(verificationCode, false);
+            throw new ValidationException(ErrorMessages.CodigoEmail.CODIGO_INVALIDO);
         }
 
         verificationCode.setUsed(true);
@@ -216,5 +231,22 @@ public class VerificationCodeService {
         verificationCode.setChallengeUsed(true);
         verificationCodeRepository.save(verificationCode);
         return verificationCode;
+    }
+
+    private void registerFailedAttempt(VerificationCode verificationCode, boolean challengeFlow) {
+        int currentAttempts = verificationCode.getAttempts() == null ? 0 : verificationCode.getAttempts();
+        int attempts = currentAttempts + 1;
+        verificationCode.setAttempts(attempts);
+
+        if (attempts >= otpMaxAttempts) {
+            verificationCode.setUsed(true);
+            if (challengeFlow) {
+                verificationCode.setChallengeUsed(true);
+            }
+            verificationCodeRepository.save(verificationCode);
+            throw new ValidationException(ErrorMessages.CodigoEmail.CODIGO_TENTATIVAS_EXCEDIDAS);
+        }
+
+        verificationCodeRepository.save(verificationCode);
     }
 }
