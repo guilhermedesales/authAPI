@@ -19,9 +19,9 @@ public class GlobalException {
                 : null;
 
         if (ex.getStatus().is5xxServerError()) {
-            log.error("[ERROR] AppException handled - status={} message={}", ex.getStatus().value(), ex.getMessage(), ex);
+            log.error("[ERRO] Excecao de aplicacao tratada - status={} mensagem={}", ex.getStatus().value(), ex.getMessage(), ex);
         } else {
-            log.warn("[ERROR] AppException handled - status={} message={}", ex.getStatus().value(), ex.getMessage());
+            log.warn("[ERRO] Excecao de aplicacao tratada - status={} mensagem={}", ex.getStatus().value(), ex.getMessage());
         }
 
         var body = new ErrorDTO(
@@ -44,18 +44,18 @@ public class GlobalException {
 
         var body = new ErrorDTO(
                 400,
-                "Erro de validação",
+                "Erro de validacao",
                 errors
         );
 
-        log.warn("[ERROR] Bean validation failed - errorsCount={}", errors.size());
+        log.warn("[ERRO] Validacao de bean falhou - totalErros={}", errors.size());
 
         return ResponseEntity.badRequest().body(body);
     }
 
     @ExceptionHandler(Exception.class)
     public ResponseEntity<ErrorDTO> handleUnexpectedException(Exception ex) {
-        log.error("[ERROR] Unexpected exception - type={} message={}", ex.getClass().getSimpleName(), ex.getMessage(), ex);
+        log.error("[ERRO] Excecao inesperada - tipo={} mensagem={}", ex.getClass().getSimpleName(), ex.getMessage(), ex);
 
         var body = new ErrorDTO(
                 500,

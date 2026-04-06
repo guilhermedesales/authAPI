@@ -1,5 +1,6 @@
 package com.api.auth.Application.DTOs.Auth.EsqueciSenha;
 
+import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.constraints.Email;
 import jakarta.validation.constraints.NotBlank;
 import lombok.AllArgsConstructor;
@@ -11,11 +12,13 @@ import lombok.NoArgsConstructor;
 @AllArgsConstructor
 public class EsqueciSenhaVerifyCodeDTO {
 
-    @NotBlank
-    @Email
+    @Schema(example = "maria.silva@empresa.com")
+    @NotBlank(message = "O email é obrigatório")
+    @Email(message = "O email informado é inválido")
     private String email;
 
-    @NotBlank
+    @Schema(example = "123456")
+    @NotBlank(message = "O código é obrigatório")
     private String code;
 }
 

@@ -127,4 +127,6 @@
 
     - retry no geolocation
 
+    - add score de risco no login para ip, endereço e device
+
     
