@@ -1,5 +1,6 @@
 package com.api.auth.Domain.Entities;
 
+import com.api.auth.Domain.Enum.SessionTrustLevel;
 import jakarta.persistence.*;
 import lombok.AllArgsConstructor;
 import lombok.Getter;
@@ -32,6 +33,10 @@ public class UserSession extends BaseEntity {
 
     private String deviceName;
     private String location;
+    @Enumerated(EnumType.STRING)
+    private SessionTrustLevel trustLevel;
+    private Integer riskScore;
+    private String riskSignals;
     private Instant revokedAt;
     private Instant lastUsedAt;
 

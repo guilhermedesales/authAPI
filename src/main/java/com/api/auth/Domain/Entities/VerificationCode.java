@@ -43,4 +43,9 @@ public class VerificationCode {
 
     // Vincula challenge de login ao sistema solicitado para evitar ambiguidade multi-sistema.
     private UUID sistemaId;
+
+    // Contexto do pedido para fluxos de step-up.
+    private UUID deviceId;
+    private String requestIp;
+    private String requestUserAgent;
 }

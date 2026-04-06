@@ -61,6 +61,9 @@ public class VerificationCodeService {
         verificationCode.setChallengeExpiryDate(null);
         verificationCode.setChallengeUsed(false);
         verificationCode.setSistemaId(null);
+        verificationCode.setDeviceId(null);
+        verificationCode.setRequestIp(null);
+        verificationCode.setRequestUserAgent(null);
         verificationCode.setAttempts(0);
 
         verificationCodeRepository.save(verificationCode);
@@ -71,6 +74,17 @@ public class VerificationCodeService {
 
     @Transactional
     public UUID generateAndSendChallenge(Usuario usuario, TipoVerificacao tipo, String novaSenhaHash, UUID sistemaId) {
+        return generateAndSendChallenge(usuario, tipo, novaSenhaHash, sistemaId, null, null, null);
+    }
+
+    @Transactional
+    public UUID generateAndSendChallenge(Usuario usuario,
+                                         TipoVerificacao tipo,
+                                         String novaSenhaHash,
+                                         UUID sistemaId,
+                                         UUID deviceId,
+                                         String requestIp,
+                                         String requestUserAgent) {
         log.info("[AUTH] Generating challenge-based verification code - userId={} tipo={} sistemaId={}",
                 usuario.getId(), tipo, sistemaId);
         verificationCodeRepository.deleteByUsuarioAndTipo(usuario, tipo);
@@ -90,6 +104,9 @@ public class VerificationCodeService {
         verificationCode.setChallengeExpiryDate(Instant.now().plusMillis(challengeExpirationMs));
         verificationCode.setChallengeUsed(false);
         verificationCode.setSistemaId(sistemaId);
+        verificationCode.setDeviceId(deviceId);
+        verificationCode.setRequestIp(requestIp);
+        verificationCode.setRequestUserAgent(requestUserAgent);
         verificationCode.setAttempts(0);
 
         verificationCodeRepository.save(verificationCode);

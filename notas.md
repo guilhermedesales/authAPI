@@ -121,6 +121,10 @@
 
     - hotfix permissao service não estava vinculando a uma role
 
-    - 
+    - rate limit com redis
+
+    - OTP com limite de tentativas
+
+    - retry no geolocation
 
     

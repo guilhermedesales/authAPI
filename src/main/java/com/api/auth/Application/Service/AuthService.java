@@ -16,6 +16,7 @@ import com.api.auth.Application.Mapper.MappingProfile;
 import com.api.auth.Application.Utils.ErrorMessages;
 import com.api.auth.Application.Utils.LogSanitizer;
 import com.api.auth.Domain.Entities.*;
+import com.api.auth.Domain.Enum.SessionTrustLevel;
 import com.api.auth.Domain.Enum.TipoVerificacao;
 import com.api.auth.Infra.Repositories.SistemaRepository;
 import com.api.auth.Infra.Repositories.UserSessionRepository;
@@ -53,9 +54,10 @@ public class AuthService {
     private final RefreshTokenService refreshTokenService;
     private final UserSessionRepository userSessionRepository;
     private final GeoLocationService geoLocationService;
+    private final LoginRiskService loginRiskService;
 
     @Autowired
-    public AuthService(UsuarioRepository usuarioRepository, JwtService jwtService, PasswordEncoder encoder, SistemaRepository sistemaRepository, UsuarioSistemaRepository usuarioSistemaRepository, MappingProfile mappingProfile, VerificationCodeService verificationCodeService, SenhaHistoricoService senhaHistoricoService, TentativasLoginService tentativasLoginService, RefreshTokenService refreshTokenService, UserSessionRepository userSessionRepository, GeoLocationService geoLocationService) {
+    public AuthService(UsuarioRepository usuarioRepository, JwtService jwtService, PasswordEncoder encoder, SistemaRepository sistemaRepository, UsuarioSistemaRepository usuarioSistemaRepository, MappingProfile mappingProfile, VerificationCodeService verificationCodeService, SenhaHistoricoService senhaHistoricoService, TentativasLoginService tentativasLoginService, RefreshTokenService refreshTokenService, UserSessionRepository userSessionRepository, GeoLocationService geoLocationService, LoginRiskService loginRiskService) {
         this.usuarioRepository = usuarioRepository;
         this.jwtService = jwtService;
         this.sistemaRepository = sistemaRepository;
@@ -68,6 +70,7 @@ public class AuthService {
         this.refreshTokenService = refreshTokenService;
         this.userSessionRepository = userSessionRepository;
         this.geoLocationService = geoLocationService;
+        this.loginRiskService = loginRiskService;
     }
 
     public RegistrarResponseDTO registrar(RegistrarDTO dto) {
@@ -125,13 +128,12 @@ public class AuthService {
         usuario.setTentativasFalhas(0);
         usuario.setBloqueadoAte(null);
         usuarioRepository.save(usuario);
-        UUID challengeId = verificationCodeService.generateAndSendChallenge(
+        return verificationCodeService.generateAndSendChallenge(
                 usuario,
                 TipoVerificacao.LOGIN,
                 null,
                 sistema.getId()
         );
-        return challengeId;
     }
 
     @Transactional
@@ -157,14 +159,115 @@ public class AuthService {
                 ? dto.getDeviceId()
                 : (context != null ? context.getDeviceId() : null);
 
-        UserSession session = resolveOrCreateSession(usuario, sistema, requestedDeviceId, context);
+        String resolvedLocation = geoLocationService.getLocation(context != null ? context.getIp() : null);
+        LoginRiskService.RiskAssessment riskAssessment = loginRiskService.assess(
+                usuario,
+                sistema,
+                requestedDeviceId,
+                context != null ? context.getIp() : null,
+                resolvedLocation
+        );
+
+        if (riskAssessment.stepUpRequired()) {
+            UUID stepUpChallengeId = verificationCodeService.generateAndSendChallenge(
+                    usuario,
+                    TipoVerificacao.LOGIN_STEP_UP,
+                    null,
+                    sistema.getId(),
+                    requestedDeviceId,
+                    context != null ? context.getIp() : null,
+                    context != null ? context.getUserAgent() : null
+            );
+
+            log.warn("[AUTH] Login step-up required - userId={} score={} signals={}",
+                    usuario.getId(), riskAssessment.score(), riskAssessment.signals());
+            return LoginResponseDTO.stepUpRequired(stepUpChallengeId, riskAssessment.score(), riskAssessment.signals());
+        }
+
+        UserSession session = resolveOrCreateSession(usuario, sistema, requestedDeviceId, context, resolvedLocation, riskAssessment);
 
         String accessToken = jwtService.generateToken(usuarioSistema, session);
         String refreshToken = jwtService.createRefreshToken(usuario, session);
 
         log.info("[AUTH] Login success - userId={} sessionId={}", usuario.getId(), session.getId());
 
-        return new LoginResponseDTO(accessToken, refreshToken, session.getDeviceId());
+        return LoginResponseDTO.authenticated(
+                accessToken,
+                refreshToken,
+                session.getDeviceId(),
+                session.getTrustLevel(),
+                session.getRiskScore(),
+                loginRiskService.deserializeSignals(session.getRiskSignals())
+        );
+    }
+
+    @Transactional
+    public LoginResponseDTO verifyStepUpLogin(VerifyCodeDTO dto, RequestContext requestContext) {
+
+        VerificationCode verificationCode = verificationCodeService
+                .validateCodeByChallenge(dto.getChallengeId(), dto.getCode(), TipoVerificacao.LOGIN_STEP_UP);
+        Usuario usuario = verificationCode.getUsuario();
+
+        UUID sistemaId = verificationCode.getSistemaId();
+        if (sistemaId == null) {
+            throw new ValidationException(ErrorMessages.Auth.SESSAO_EXPIRADA);
+        }
+
+        Sistema sistema = sistemaRepository.findById(sistemaId)
+                .orElseThrow(() -> new NotFoundException(ErrorMessages.Recursos.SISTEMA_NAO_ENCONTRADO));
+
+        UsuarioSistema usuarioSistema = usuarioSistemaRepository
+                .findByUsuarioAndSistema(usuario, sistema)
+                .orElseThrow(() -> new NotFoundException(ErrorMessages.Recursos.USUARIO_NAO_ENCONTRADO_SISTEMA));
+
+        RequestContext boundContext = new RequestContext();
+        boundContext.setIp(verificationCode.getRequestIp() != null
+                ? verificationCode.getRequestIp()
+                : requestContext != null ? requestContext.getIp() : null);
+        boundContext.setUserAgent(verificationCode.getRequestUserAgent() != null
+                ? verificationCode.getRequestUserAgent()
+                : requestContext != null ? requestContext.getUserAgent() : null);
+
+        UUID boundDeviceId = verificationCode.getDeviceId() != null
+                ? verificationCode.getDeviceId()
+                : dto.getDeviceId() != null
+                    ? dto.getDeviceId()
+                    : requestContext != null ? requestContext.getDeviceId() : null;
+        boundContext.setDeviceId(boundDeviceId);
+
+        String resolvedLocation = geoLocationService.getLocation(boundContext.getIp());
+        LoginRiskService.RiskAssessment riskAssessment = loginRiskService.assess(
+                usuario,
+                sistema,
+                boundDeviceId,
+                boundContext.getIp(),
+                resolvedLocation
+        );
+
+        if (riskAssessment.trustLevel() == SessionTrustLevel.TRUSTED) {
+            riskAssessment = new LoginRiskService.RiskAssessment(
+                    riskAssessment.score(),
+                    SessionTrustLevel.SUSPICIOUS,
+                    false,
+                    riskAssessment.signals()
+            );
+        }
+
+        UserSession session = resolveOrCreateSession(usuario, sistema, boundDeviceId, boundContext, resolvedLocation, riskAssessment);
+        String accessToken = jwtService.generateToken(usuarioSistema, session);
+        String refreshToken = jwtService.createRefreshToken(usuario, session);
+
+        log.info("[AUTH] Step-up login success - userId={} sessionId={} score={}",
+                usuario.getId(), session.getId(), riskAssessment.score());
+
+        return LoginResponseDTO.authenticated(
+                accessToken,
+                refreshToken,
+                session.getDeviceId(),
+                session.getTrustLevel(),
+                session.getRiskScore(),
+                loginRiskService.deserializeSignals(session.getRiskSignals())
+        );
     }
 
     @Transactional
@@ -271,12 +374,29 @@ public class AuthService {
         UsuarioSistema usuarioSistema = usuarioSistemaRepository.findByUsuarioAndSistema(usuario, sistema)
                 .orElseThrow(() -> new NotFoundException(ErrorMessages.Recursos.USUARIO_NAO_ENCONTRADO_SISTEMA));
 
-        UserSession session = createSession(usuario, sistema, context, context != null ? context.getDeviceId() : null);
+        UUID requestedDeviceId = context != null ? context.getDeviceId() : null;
+        String resolvedLocation = geoLocationService.getLocation(context != null ? context.getIp() : null);
+        LoginRiskService.RiskAssessment riskAssessment = loginRiskService.assess(
+                usuario,
+                sistema,
+                requestedDeviceId,
+                context != null ? context.getIp() : null,
+                resolvedLocation
+        );
+
+        UserSession session = createSession(usuario, sistema, context, requestedDeviceId, resolvedLocation, riskAssessment);
         String accessToken = jwtService.generateToken(usuarioSistema, session);
         String refreshToken = jwtService.createRefreshToken(usuario, session);
 
         log.info("[AUTH] Forgot-password confirmation success - userId={} sistemaId={}", usuario.getId(), sistema.getId());
-        return new LoginResponseDTO(accessToken, refreshToken, session.getDeviceId());
+        return LoginResponseDTO.authenticated(
+                accessToken,
+                refreshToken,
+                session.getDeviceId(),
+                session.getTrustLevel(),
+                session.getRiskScore(),
+                loginRiskService.deserializeSignals(session.getRiskSignals())
+        );
     }
 
     @Transactional
@@ -353,36 +473,55 @@ public class AuthService {
         return browser + " (" + os + ")";
     }
 
-    private UserSession resolveOrCreateSession(Usuario usuario, Sistema sistema, UUID deviceId, RequestContext context) {
+    private UserSession resolveOrCreateSession(Usuario usuario,
+                                               Sistema sistema,
+                                               UUID deviceId,
+                                               RequestContext context,
+                                               String resolvedLocation,
+                                               LoginRiskService.RiskAssessment riskAssessment) {
         if (deviceId != null) {
             UserSession existingSession = userSessionRepository
                     .findByUsuarioIdAndSistemaIdAndDeviceIdAndRevokedAtIsNull(usuario.getId(), sistema.getId(), deviceId)
                     .orElse(null);
 
             if (existingSession != null) {
-                return updateSessionContext(existingSession, context);
+                return updateSessionContext(existingSession, context, resolvedLocation, riskAssessment);
             }
         }
 
-        return createSession(usuario, sistema, context, deviceId);
+        return createSession(usuario, sistema, context, deviceId, resolvedLocation, riskAssessment);
     }
 
-    private UserSession createSession(Usuario usuario, Sistema sistema, RequestContext context, UUID requestedDeviceId) {
+    private UserSession createSession(Usuario usuario,
+                                      Sistema sistema,
+                                      RequestContext context,
+                                      UUID requestedDeviceId,
+                                      String resolvedLocation,
+                                      LoginRiskService.RiskAssessment riskAssessment) {
         UserSession session = new UserSession();
         session.setUsuario(usuario);
         session.setSistema(sistema);
         session.setDeviceId(requestedDeviceId != null ? requestedDeviceId : UUID.randomUUID());
         session.setIp(context != null ? context.getIp() : null);
         session.setDeviceName(parseUserAgent(context != null ? context.getUserAgent() : null));
-        session.setLocation(geoLocationService.getLocation(context != null ? context.getIp() : null));
+        session.setLocation(resolvedLocation);
+        session.setTrustLevel(riskAssessment.trustLevel());
+        session.setRiskScore(riskAssessment.score());
+        session.setRiskSignals(loginRiskService.serializeSignals(riskAssessment.signals()));
         session.setLastUsedAt(Instant.now());
         return userSessionRepository.save(session);
     }
 
-    private UserSession updateSessionContext(UserSession session, RequestContext context) {
+    private UserSession updateSessionContext(UserSession session,
+                                             RequestContext context,
+                                             String resolvedLocation,
+                                             LoginRiskService.RiskAssessment riskAssessment) {
         session.setIp(context != null ? context.getIp() : session.getIp());
         session.setDeviceName(parseUserAgent(context != null ? context.getUserAgent() : null));
-        session.setLocation(geoLocationService.getLocation(context != null ? context.getIp() : null));
+        session.setLocation(resolvedLocation);
+        session.setTrustLevel(riskAssessment.trustLevel());
+        session.setRiskScore(riskAssessment.score());
+        session.setRiskSignals(loginRiskService.serializeSignals(riskAssessment.signals()));
         session.setLastUsedAt(Instant.now());
         return userSessionRepository.save(session);
     }

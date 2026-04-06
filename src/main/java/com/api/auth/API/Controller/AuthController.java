@@ -81,6 +81,16 @@ public class AuthController {
         return ResponseEntity.ok(authService.verifyCodeLogin(dto, context));
     }
 
+    @PostMapping("/login/step-up/verify-code")
+    public ResponseEntity<LoginResponseDTO> verifyCodeLoginStepUp(
+            @RequestBody @Valid VerifyCodeDTO dto,
+            HttpServletRequest request
+    ) {
+        RequestContext context = buildRequestContext(request);
+        context.setDeviceId(dto.getDeviceId());
+        return ResponseEntity.ok(authService.verifyStepUpLogin(dto, context));
+    }
+
     @PostMapping("/refresh-token")
     public ResponseEntity<RefreshTokenResponseDTO> refreshToken(@RequestBody RefreshTokenDTO dto) {
         log.info("[AUTH] Refresh token request received");

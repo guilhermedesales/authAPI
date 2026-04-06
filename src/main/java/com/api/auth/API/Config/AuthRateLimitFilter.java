@@ -120,7 +120,8 @@ public class AuthRateLimitFilter extends OncePerRequestFilter {
         String uri = request.getRequestURI();
         return switch (uri) {
             case "/auth/login" -> new RateLimitRule("login", loginMaxAttempts, loginWindowSeconds);
-            case "/auth/login/verify-code" -> new RateLimitRule("verify-code", verifyCodeMaxAttempts, verifyCodeWindowSeconds);
+            case "/auth/login/verify-code", "/auth/login/step-up/verify-code" ->
+                    new RateLimitRule("verify-code", verifyCodeMaxAttempts, verifyCodeWindowSeconds);
             case "/auth/esqueci-senha/request" -> new RateLimitRule("forgot-password-request", forgotPasswordRequestMaxAttempts, forgotPasswordRequestWindowSeconds);
             case "/auth/esqueci-senha/verify-code" -> new RateLimitRule("forgot-password-verify", forgotPasswordVerifyMaxAttempts, forgotPasswordVerifyWindowSeconds);
             case "/auth/refresh-token" -> new RateLimitRule("refresh", refreshMaxAttempts, refreshWindowSeconds);
