@@ -7,8 +7,9 @@ public final class ErrorMessages {
     public static class Auth {
         public static final String CREDENCIAIS_INVALIDAS = "E-mail ou senha inválidos.";
         public static final String SESSAO_EXPIRADA = "Sua sessão expirou. Faça login novamente.";
-        public static final String REFRESH_TOKEN_REUSE_DETECTADO = "Reutilização de refresh token detectada. Todas as sessões foram encerradas por segurança.";
+        public static final String REFRESH_TOKEN_REUSE_DETECTADO = "Reutilização de refresh token detectada. Esta sessão foi encerrada por segurança.";
         public static final String EMAIL_JA_CADASTRADO = "Esse email já possui uma conta cadastrada";
+        public static final String RATE_LIMIT_EXCEDIDO = "Muitas tentativas. Tente novamente em alguns instantes.";
     }
 
     public static class Senha {
@@ -37,6 +38,7 @@ public final class ErrorMessages {
         public static final String CODIGO_INVALIDO = "Código Inválido";
         public static final String CODIGO_UTILIZADO = "Código já utilizado.";
         public static final String CODIGO_EXPIRADO = "Código expirado.";
+        public static final String CODIGO_TENTATIVAS_EXCEDIDAS = "Limite de tentativas do código excedido. Solicite um novo código.";
     }
 
 }

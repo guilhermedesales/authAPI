@@ -3,6 +3,7 @@ package com.api.auth.API.Config;
 import io.swagger.v3.oas.models.Components;
 import io.swagger.v3.oas.models.OpenAPI;
 import io.swagger.v3.oas.models.info.Info;
+import io.swagger.v3.oas.models.info.License;
 import io.swagger.v3.oas.models.security.SecurityRequirement;
 import io.swagger.v3.oas.models.security.SecurityScheme;
 import org.springframework.context.annotation.Bean;
@@ -14,7 +15,11 @@ public class SwaggerConfig {
     @Bean
     public OpenAPI customOpenAPI() {
         return new OpenAPI()
-                .info(new Info().title("API de auth").version("v1"))
+                .info(new Info()
+                        .title("Auth API")
+                        .description("API de autenticação e autorização com OTP, sessão por dispositivo e rotação de refresh token.")
+                        .version("v1")
+                        .license(new License().name("Uso interno")))
                 .addSecurityItem(new SecurityRequirement().addList("bearerAuth"))
                 .components(new Components()
                         .addSecuritySchemes("bearerAuth",

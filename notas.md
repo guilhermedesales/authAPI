@@ -13,14 +13,33 @@
 >- [x] Email deve ser único
 >- [x] Não permitir mudar senha para uma senha já usada antes (últimas 3–5)
 >- [x] Endpoint de logout (invalida refresh token)
->- [ ] Guardar sessão do usuário por device (ip, pc/celular, localização resumida) — usar para lógica de login suspeito
+>- [x] Guardar sessão do usuário por device (ip, pc/celular, localização resumida) — usar para lógica de login suspeito
 >- [x] Verificar se refresh inválido foi usado para tentar acessar o sistema (limpar tokens ativos)
 >- [ ] Criar um model de paginação personalizado pra substituir o padrão do spring
->- [ ] Invalidar sessões depois de trocar senha (no fluxo de "alterar senha" e "esqueci senha")
->- [ ] rate limit por ip para login, esqueci senha, etc
+>- [x] Invalidar sessões depois de trocar senha (no fluxo de "alterar senha" e "esqueci senha")
+>- [x] rate limit por ip para login, esqueci senha, etc
 >- [ ] Melhorar padronização de erros
+>- [x] Add get sessão por user com filtros de busca por location, device
+>- [ ] Implementar autorização por role/permissão (RBAC)
+>- [ ] Adicionar roles/permissões no JWT (authorities)
+>- [ ] Proteger endpoints administrativos (sistema, role, permissao, usuarioSistema)
+>- [ ] Evitar enumeração de usuário no login (resposta padrão)
+>- [ ] Implementar revogação de access token (blacklist / Redis)
+>- [ ] Resolver race condition no refresh token
+>- [ ] Hash do OTP (não salvar código em texto puro)
+>- [ ] Melhorar rate limit (não só IP, incluir email/user/device)
+>- [ ] Limitar quantidade de sessões por usuário
+>- [ ] Criar auditoria de segurança (login, refresh, senha, logout)
+>- [ ] Criar testes de integração (login, refresh, esqueci senha)
+>- [ ] Adicionar @Version nas entidades críticas
+>- [ ] Melhorar modelagem (índices e constraints)
+>- [ ] Criar limpeza automática (OTP, refresh, sessões)
+>- [ ] Melhorar logs pensando no front
+>- [ ] Implementar 2FA (Google Authenticator / TOTP)
+>- [ ] Login com Google (OAuth2)
 
 ---
+
 ## Separação por contexto
 
 ### 🔐 Segurança
@@ -28,8 +47,14 @@
 - [x] validação de email com código
 - [x] bloqueio por tentativas de login
 - [x] detectar uso de refresh inválido (revogar sessões)
-- [ ] invalidar sessão dps de mudar senha
 - [ ] rate limit por ip para login, esqueci senha, etc
+- [ ] autorização por role/permissão (RBAC)
+- [ ] roles/permissões no JWT (authorities)
+- [ ] proteção de endpoints administrativos
+- [ ] evitar enumeração de usuário no login
+- [ ] revogação de access token
+- [ ] hash de OTP
+- [ ] auditoria de segurança
 
 ### 🔑 Senha
 - [x] padrão forte
@@ -42,20 +67,31 @@
 
 ### 🚪 Sessão
 - [x] logout (invalidar refresh token)
-- [ ] sessão por device (ip, pc/celular, localização)
+- [x] sessão por device (ip, pc/celular, localização)
+- [x] get sessão por user com filtros de busca por location, device
+- [ ] invalidar sessões ativas depois de trocar senha (no fluxo de "alterar senha" e "esqueci senha")
+- [x] logout invalida apenas a sessão atual
+- [ ] limitar sessões por usuário
 
 ### ⚠️ Erros & Infra
 - [x] exceptions + middlewares
 - [ ] melhorar padronização
+- [ ] testes de integração
 
 ---
 
 ## ⚠️ Problemas Atuais
 
-    - nada agr
-
+    - JWT sem authorities (sem autorização real)
+    - Endpoints administrativos sem proteção
+    - OTP salvo em texto puro
+    - Race condition no refresh token
+    - Falta revogação de access token
+    - Enumeração de usuário no login
+    - Rate limit apenas por IP (fraco contra botnet)
 
 ---
+
 
 # HISTÓRICO DE DESENVOLVIMENTO 
 
@@ -98,6 +134,34 @@
 
     - salva apenas hash do refresh no banco e cria id publico pra busca
 
-    - arruma fluxo de reuso do refresh token
+    - arrumei fluxo de reuso do refresh token
+
+## 04/04/26
+
+    - add sessão por device (guarda ip, location e tipo de device) - usa o ip-api por enquanto
+
+    - add device id para identificar se é o mesmo device ou não
+
+    - logout por sessão (invalida apenas a sessão atual)
+
+    - add get device por user
+
+    - add rate limit por ip para (login: 10 req / 60s, verify-code: 6 req / 600s, forgot-password request: 5 req / 900s, forgot-password verify: 8 req / 600s, refresh: 30 req / 60s
+
+## 06/04/26
+
+    - add challengeId em todos os fluxos q possuem OTP (cod de verificação do email)
+
+    - hotfix permissao service não estava vinculando a uma role
+
+    - rate limit com redis
+
+    - OTP com limite de tentativas
+
+    - retry no geolocation
+
+    - add score de risco no login para ip, endereço e device
+
+    - add documentação no swagger
 
     

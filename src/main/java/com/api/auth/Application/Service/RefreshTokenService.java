@@ -1,25 +1,44 @@
 package com.api.auth.Application.Service;
 
+import com.api.auth.Domain.Entities.UserSession;
 import com.api.auth.Domain.Entities.Usuario;
 import com.api.auth.Infra.Repositories.RefreshTokenRepository;
+import com.api.auth.Infra.Repositories.UserSessionRepository;
 import jakarta.transaction.Transactional;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
+
+import java.time.Instant;
 
 @Slf4j
 @Service
 public class RefreshTokenService {
 
     private final RefreshTokenRepository refreshTokenRepository;
+    private final UserSessionRepository userSessionRepository;
 
-    public RefreshTokenService(RefreshTokenRepository refreshTokenRepository) {
+    public RefreshTokenService(RefreshTokenRepository refreshTokenRepository,
+                               UserSessionRepository userSessionRepository) {
         this.refreshTokenRepository = refreshTokenRepository;
+        this.userSessionRepository = userSessionRepository;
     }
 
     @Transactional(Transactional.TxType.REQUIRES_NEW)
     public void revokeAllByUsuario(Usuario usuario) {
-        int total = refreshTokenRepository.revokeAllByUsuarioId(usuario.getId());
-        log.info("[AUTH] Refresh tokens revoked - userId={} total={}", usuario.getId(), total);
+        Instant now = Instant.now();
+        int revokedTokens = refreshTokenRepository.revokeAllByUsuarioId(usuario.getId());
+        int revokedSessions = userSessionRepository.revokeAllByUsuarioId(usuario.getId(), now);
+        log.info("[AUTH] User security revoke executed - userId={} revokedTokens={} revokedSessions={}",
+                usuario.getId(), revokedTokens, revokedSessions);
+    }
+
+    @Transactional(Transactional.TxType.REQUIRES_NEW)
+    public void revokeBySession(UserSession session) {
+        Instant now = Instant.now();
+        int revokedTokens = refreshTokenRepository.revokeAllBySessionId(session.getId());
+        int revokedSessions = userSessionRepository.revokeBySessionId(session.getId(), now);
+        log.warn("[AUTH] Session security revoke executed - sessionId={} revokedTokens={} revokedSessions={}",
+                session.getId(), revokedTokens, revokedSessions);
     }
 
 }

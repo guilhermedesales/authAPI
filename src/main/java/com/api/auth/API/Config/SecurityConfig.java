@@ -30,14 +30,16 @@ public class SecurityConfig {
                                 "/swagger/**",
                                 "/swagger-ui/**",
                                 "/v3/api-docs/**",
-                                "/h2-console/**"
+                                "/h2-console/**",
+                                "/auth/register",
+                                "/auth/login",
+                                "/auth/login/verify-code",
+                                "/auth/refresh-token",
+                                "/auth/esqueci-senha/request",
+                                "/auth/esqueci-senha/verify-code",
+                                "/auth/esqueci-senha/confirm"
                         ).permitAll()
-                        .requestMatchers(
-                                "/health/validateJWT",
-                                "/auth/logout",
-                                "/auth/alterar-senha"
-                        ).authenticated()
-                        .anyRequest().permitAll()
+                        .anyRequest().authenticated()
                 )
                 .addFilterBefore(requestLoggingFilter, UsernamePasswordAuthenticationFilter.class)
                 .addFilterBefore(jwtAuthFilter, UsernamePasswordAuthenticationFilter.class)

@@ -29,6 +29,8 @@ public class VerificationCode {
     @Column(nullable = false)
     private boolean used = false;
 
+    private Integer attempts = 0;
+
     @Enumerated(EnumType.STRING)
     private TipoVerificacao tipo; // LOGIN, ALTERAR_SENHA, etc
 
@@ -38,4 +40,12 @@ public class VerificationCode {
     private UUID challengeId;
     private Instant challengeExpiryDate;
     private boolean challengeUsed = false;
+
+    // Vincula challenge de login ao sistema solicitado para evitar ambiguidade multi-sistema.
+    private UUID sistemaId;
+
+    // Contexto do pedido para fluxos de step-up.
+    private UUID deviceId;
+    private String requestIp;
+    private String requestUserAgent;
 }

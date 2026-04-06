@@ -21,6 +21,11 @@ public class RequestLoggingFilter extends OncePerRequestFilter {
 
     private static final String REQUEST_ID_HEADER = "X-Request-Id";
     private static final String REQUEST_ID_MDC_KEY = "requestId";
+    private final ClientIpResolver clientIpResolver;
+
+    public RequestLoggingFilter(ClientIpResolver clientIpResolver) {
+        this.clientIpResolver = clientIpResolver;
+    }
 
     @Override
     protected void doFilterInternal(HttpServletRequest request,
@@ -36,8 +41,9 @@ public class RequestLoggingFilter extends OncePerRequestFilter {
         long start = System.currentTimeMillis();
         String method = request.getMethod();
         String uri = request.getRequestURI();
+        String resolvedIp = clientIpResolver.resolve(request);
 
-        log.info("[HTTP] Request start - method={} uri={} remoteAddr={}", method, uri, request.getRemoteAddr());
+        log.info("[HTTP] Request start - method={} uri={} remoteAddr={}", method, uri, resolvedIp);
 
         try {
             filterChain.doFilter(request, response);
