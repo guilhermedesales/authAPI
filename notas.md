@@ -20,9 +20,9 @@
 >- [x] rate limit por ip para login, esqueci senha, etc
 >- [ ] Melhorar padronização de erros
 >- [x] Add get sessão por user com filtros de busca por location, device
->- [ ] Implementar autorização por role/permissão (RBAC)
+>- [x] Implementar autorização por role/permissão (RBAC)
 >- [ ] Adicionar roles/permissões no JWT (authorities)
->- [ ] Proteger endpoints administrativos (sistema, role, permissao, usuarioSistema)
+>- [x] Proteger endpoints administrativos (sistema, role, permissao, usuarioSistema)
 >- [ ] Evitar enumeração de usuário no login (resposta padrão)
 >- [ ] Implementar revogação de access token (blacklist / Redis)
 >- [ ] Resolver race condition no refresh token
@@ -48,7 +48,7 @@
 - [x] bloqueio por tentativas de login
 - [x] detectar uso de refresh inválido (revogar sessões)
 - [ ] rate limit por ip para login, esqueci senha, etc
-- [ ] autorização por role/permissão (RBAC)
+- [x] autorização por role/permissão (RBAC)
 - [ ] roles/permissões no JWT (authorities)
 - [ ] proteção de endpoints administrativos
 - [ ] evitar enumeração de usuário no login
@@ -82,13 +82,13 @@
 
 ## ⚠️ Problemas Atuais
 
-    - JWT sem authorities (sem autorização real)
-    - Endpoints administrativos sem proteção
     - OTP salvo em texto puro
     - Race condition no refresh token
     - Falta revogação de access token
     - Enumeração de usuário no login
     - Rate limit apenas por IP (fraco contra botnet)
+
+    - sistema default continua sendo usado dps do bootstrap (so usar quando contagem de sistemas for 0)
 
 ---
 
@@ -164,4 +164,30 @@
 
     - add documentação no swagger
 
+## 09/04/26
+
+    - implementação completa de RBAC (multi-tenant)
+
+    - introdução de GLOBAL_ADMIN (escopo global sem sistema)
+
+    - bootstrap automático de roles por sistema (USER, ADMIN)
+
+    - criação de sistema default para resolver problema de bootstrap
     
+    - auto-provisionamento de vínculo UsuarioSistema (register + first login)
+    
+    - proteção de endpoints via @PreAuthorize (Spring Method Security)
+
+    - enforcement de escopo por sistema (RBACAuthorizationService)
+
+    - inclusão de authorities no JWT + parsing no JwtAuthFilter
+
+    - fallback de sistema (resolveSystemOrDefault)
+
+    - inicialização de RBAC no startup (initializer)
+
+    - ajustes de DTOs para suportar multi-tenant
+
+    - testes iniciais de bootstrap (RBAC)
+
+    - correção de encoding do projeto (UTF-8)

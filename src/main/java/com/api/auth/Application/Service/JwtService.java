@@ -2,6 +2,7 @@ package com.api.auth.Application.Service;
 
 import com.api.auth.Application.Exceptions.ValidationException;
 import com.api.auth.Application.Utils.ErrorMessages;
+import com.api.auth.Application.Utils.RoleNames;
 import com.api.auth.Domain.Entities.RefreshToken;
 import com.api.auth.Domain.Entities.UserSession;
 import com.api.auth.Domain.Entities.Usuario;
@@ -17,7 +18,9 @@ import org.springframework.stereotype.Service;
 
 import java.security.Key;
 import java.time.Instant;
+import java.util.ArrayList;
 import java.util.Date;
+import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -57,10 +60,18 @@ public class JwtService {
     public String generateToken(UsuarioSistema usuarioSistema, UserSession session) {
 
         Usuario usuario = usuarioSistema.getUsuario();
+        List<String> authorities = new ArrayList<>();
+        authorities.add(RoleNames.toAuthority(usuarioSistema.getRole().getNome()));
+        if (usuario.isGlobalAdmin()) {
+            authorities.add(RoleNames.toAuthority(RoleNames.GLOBAL_ADMIN));
+        }
+
         JwtBuilder builder = Jwts.builder()
 
                 .setSubject(usuario.getId().toString()) // id do user
                 .claim("nome", usuario.getNome()) // nome do user
+                .claim("authorities", authorities)
+                .claim("globalAdmin", usuario.isGlobalAdmin())
                 .claim("email", usuario.getEmail()) // email do user
 
                 .claim("sistemaId", usuarioSistema.getSistema().getId()) // id do sistema
