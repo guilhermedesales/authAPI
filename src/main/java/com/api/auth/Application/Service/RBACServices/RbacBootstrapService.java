@@ -43,6 +43,7 @@ public class RbacBootstrapService {
 
     @Transactional
     public Sistema ensureDefaultSystem() {
+
         Sistema defaultSystem = sistemaRepository.findByNomeIgnoreCase(defaultSystemName)
                 .orElseGet(() -> sistemaRepository.save(Sistema.builder()
                         .nome(defaultSystemName)
@@ -55,11 +56,14 @@ public class RbacBootstrapService {
 
     @Transactional
     public Sistema resolveSystemOrDefault(UUID sistemaId) {
-        if (sistemaId != null) {
+        if (sistemaId != null ) {
             return sistemaRepository.findById(sistemaId)
                     .orElseThrow(() -> new NotFoundException(ErrorMessages.Recursos.SISTEMA_NAO_ENCONTRADO));
         }
-        return ensureDefaultSystem();
+        if (sistemaRepository.count() <= 1){ // cai no default ate ter outro sistema
+            return ensureDefaultSystem();
+        }
+        throw new NotFoundException(ErrorMessages.Recursos.SISTEMA_NAO_ENCONTRADO);
     }
 
     @Transactional

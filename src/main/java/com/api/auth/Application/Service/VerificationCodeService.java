@@ -13,10 +13,12 @@ import jakarta.transaction.Transactional;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 
 import java.security.SecureRandom;
 import java.time.Instant;
+import java.util.List;
 import java.util.UUID;
 
 @Slf4j
@@ -27,6 +29,7 @@ public class VerificationCodeService {
     private final VerificationCodeRepository verificationCodeRepository;
     private final EmailService emailService;
     private final UsuarioRepository usuarioRepository;
+    private final PasswordEncoder encoder;
 
     @Value("${VERIFICATION_CODE_EXPIRATION}")
     private long expirationMs;
@@ -52,7 +55,7 @@ public class VerificationCodeService {
 
         VerificationCode verificationCode = new VerificationCode();
         verificationCode.setUsuario(usuario);
-        verificationCode.setCode(code);
+        verificationCode.setCode(encoder.encode(code));
         verificationCode.setExpiryDate(Instant.now().plusMillis(expirationMs));
         verificationCode.setUsed(false);
         verificationCode.setTipo(tipo);
@@ -95,7 +98,7 @@ public class VerificationCodeService {
 
         VerificationCode verificationCode = new VerificationCode();
         verificationCode.setUsuario(usuario);
-        verificationCode.setCode(code);
+        verificationCode.setCode(encoder.encode(code));
         verificationCode.setExpiryDate(Instant.now().plusMillis(expirationMs));
         verificationCode.setUsed(false);
         verificationCode.setTipo(tipo);
@@ -135,7 +138,7 @@ public class VerificationCodeService {
             throw new ValidationException(ErrorMessages.CodigoEmail.CODIGO_EXPIRADO);
         }
 
-        if (!verificationCode.getCode().equals(code)) {
+        if (!isOtpCodeMatch(code, verificationCode.getCode())) {
             registerFailedAttempt(verificationCode, true);
             throw new ValidationException(ErrorMessages.CodigoEmail.CODIGO_INVALIDO);
         }
@@ -158,7 +161,14 @@ public class VerificationCodeService {
     public VerificationCode validateCode(String code, TipoVerificacao tipoEsperado) {
         log.info("[AUTH] Validating verification code - tipo={} codeLength={}",
                 tipoEsperado, code == null ? 0 : code.length());
-        VerificationCode verificationCode = verificationCodeRepository.findByCode(code)
+
+        Instant now = Instant.now();
+        List<VerificationCode> activeCodes = verificationCodeRepository
+                .findAllByTipoAndUsedFalseAndExpiryDateAfterOrderByExpiryDateDesc(tipoEsperado, now);
+
+        VerificationCode verificationCode = activeCodes.stream()
+                .filter(candidate -> isOtpCodeMatch(code, candidate.getCode()))
+                .findFirst()
                 .orElseThrow(() -> new NotFoundException(ErrorMessages.CodigoEmail.CODIGO_INVALIDO));
 
         if (verificationCode.isUsed()) {
@@ -210,7 +220,7 @@ public class VerificationCodeService {
             throw new ValidationException(ErrorMessages.CodigoEmail.CODIGO_EXPIRADO);
         }
 
-        if (!verificationCode.getCode().equals(code)) {
+        if (!isOtpCodeMatch(code, verificationCode.getCode())) {
             registerFailedAttempt(verificationCode, false);
             throw new ValidationException(ErrorMessages.CodigoEmail.CODIGO_INVALIDO);
         }
@@ -265,5 +275,12 @@ public class VerificationCodeService {
         }
 
         verificationCodeRepository.save(verificationCode);
+    }
+
+    private boolean isOtpCodeMatch(String rawCode, String storedHash) {
+        if (rawCode == null || storedHash == null) {
+            return false;
+        }
+        return encoder.matches(rawCode, storedHash);
     }
 }

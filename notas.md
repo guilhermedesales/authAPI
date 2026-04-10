@@ -26,7 +26,7 @@
 >- [ ] Evitar enumeração de usuário no login (resposta padrão)
 >- [ ] Implementar revogação de access token (blacklist / Redis)
 >- [ ] Resolver race condition no refresh token
->- [ ] Hash do OTP (não salvar código em texto puro)
+>- [x] Hash do OTP (não salvar código em texto puro)
 >- [ ] Melhorar rate limit (não só IP, incluir email/user/device)
 >- [ ] Limitar quantidade de sessões por usuário
 >- [ ] Criar auditoria de segurança (login, refresh, senha, logout)
@@ -49,11 +49,11 @@
 - [x] detectar uso de refresh inválido (revogar sessões)
 - [ ] rate limit por ip para login, esqueci senha, etc
 - [x] autorização por role/permissão (RBAC)
-- [ ] roles/permissões no JWT (authorities)
-- [ ] proteção de endpoints administrativos
+- [x] roles/permissões no JWT (authorities)
+- [x] proteção de endpoints administrativos
 - [ ] evitar enumeração de usuário no login
 - [ ] revogação de access token
-- [ ] hash de OTP
+- [x] hash de OTP
 - [ ] auditoria de segurança
 
 ### 🔑 Senha
@@ -82,13 +82,12 @@
 
 ## ⚠️ Problemas Atuais
 
-    - OTP salvo em texto puro
     - Race condition no refresh token
     - Falta revogação de access token
     - Enumeração de usuário no login
     - Rate limit apenas por IP (fraco contra botnet)
 
-    - sistema default continua sendo usado dps do bootstrap (so usar quando contagem de sistemas for 0)
+    - não pega o device Id no esqueci senha (esqueci a senha em um dispositivo novo deveria ser alto nivel de risco)
 
 ---
 
@@ -191,3 +190,9 @@
     - testes iniciais de bootstrap (RBAC)
 
     - correção de encoding do projeto (UTF-8)
+
+## 10/04/26
+
+     - so usa o sistema default se não tiver nenhum outro sistema registrado
+
+    - otp salvo em hash no banco
