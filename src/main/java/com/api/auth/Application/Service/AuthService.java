@@ -369,7 +369,7 @@ public class AuthService {
             throw new ValidationException("Nova senha e confirmação não conferem.");
         }
 
-        validarSenha(dto.getNovaSenha());
+        validarSenha(dto.getNovaSenha()); // senha forte
 
         VerificationCode verificationCode = verificationCodeService.validateForgotPasswordChallenge(dto.getChallengeId());
         Usuario usuario = verificationCode.getUsuario();
@@ -403,7 +403,14 @@ public class AuthService {
                 resolvedLocation
         );
 
-        UserSession session = createSession(usuario, sistema, context, requestedDeviceId, resolvedLocation, riskAssessment);
+        UserSession session = resolveOrCreateSessionForForgotPassword(
+                usuario,
+                sistema,
+                requestedDeviceId,
+                context,
+                resolvedLocation,
+                riskAssessment
+        );
         String accessToken = jwtService.generateToken(usuarioSistema, session);
         String refreshToken = jwtService.createRefreshToken(usuario, session);
 
@@ -504,6 +511,34 @@ public class AuthService {
                     .orElse(null);
 
             if (existingSession != null) {
+                return updateSessionContext(existingSession, context, resolvedLocation, riskAssessment);
+            }
+        }
+
+        return createSession(usuario, sistema, context, deviceId, resolvedLocation, riskAssessment);
+    }
+
+    private UserSession resolveOrCreateSessionForForgotPassword(Usuario usuario,
+                                                                Sistema sistema,
+                                                                UUID deviceId,
+                                                                RequestContext context,
+                                                                String resolvedLocation,
+                                                                LoginRiskService.RiskAssessment riskAssessment) {
+        if (deviceId != null) {
+            UserSession existingActiveSession = userSessionRepository
+                    .findByUsuarioIdAndSistemaIdAndDeviceIdAndRevokedAtIsNull(usuario.getId(), sistema.getId(), deviceId)
+                    .orElse(null);
+
+            if (existingActiveSession != null) {
+                return updateSessionContext(existingActiveSession, context, resolvedLocation, riskAssessment);
+            }
+
+            UserSession existingSession = userSessionRepository
+                    .findTopByUsuarioIdAndSistemaIdAndDeviceIdOrderByUpdatedAtDesc(usuario.getId(), sistema.getId(), deviceId)
+                    .orElse(null);
+
+            if (existingSession != null) {
+                existingSession.setRevokedAt(null);
                 return updateSessionContext(existingSession, context, resolvedLocation, riskAssessment);
             }
         }

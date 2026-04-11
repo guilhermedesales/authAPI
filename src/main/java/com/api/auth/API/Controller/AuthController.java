@@ -261,7 +261,9 @@ public class AuthController {
             @ApiResponse(responseCode = "500", description = "Erro interno")
     })
     public ResponseEntity<LoginResponseDTO> confirmarRecuperacaoSenha(@RequestBody @Valid EsqueciSenhaConfirmDTO dto, HttpServletRequest request) {
-        LoginResponseDTO response = authService.confirmarEsqueciSenha(dto, buildRequestContext(request));
+        RequestContext contexto = buildRequestContext(request);
+        contexto.setDeviceId(dto.getDeviceId());
+        LoginResponseDTO response = authService.confirmarEsqueciSenha(dto, contexto);
         return ResponseEntity.ok(response);
     }
 

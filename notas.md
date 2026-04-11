@@ -87,8 +87,6 @@
     - Enumeração de usuário no login
     - Rate limit apenas por IP (fraco contra botnet)
 
-    - não pega o device Id no esqueci senha (esqueci a senha em um dispositivo novo deveria ser alto nivel de risco)
-
 ---
 
 
@@ -196,3 +194,5 @@
      - so usa o sistema default se não tiver nenhum outro sistema registrado
 
     - otp salvo em hash no banco
+
+    - pega o deviceId no fluxo de esqueci senha (evita duplicar sessões de mesmo device e sistema)

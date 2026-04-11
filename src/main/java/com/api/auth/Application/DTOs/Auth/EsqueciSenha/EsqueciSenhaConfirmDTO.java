@@ -29,5 +29,8 @@ public class EsqueciSenhaConfirmDTO {
     @Schema(example = "d290f1ee-6c54-4b01-90e6-d701748f0851")
     @NotNull(message = "O sistemaId é obrigatório")
     private UUID sistemaId;
+
+    @Schema(example = "d290f1ee-6c54-4b01-90e6-d701748f0851", nullable = true)
+    private UUID deviceId;
 }
 

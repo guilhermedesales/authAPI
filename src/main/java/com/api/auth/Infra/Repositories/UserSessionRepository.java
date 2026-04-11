@@ -36,6 +36,8 @@ public interface UserSessionRepository extends JpaRepository<UserSession, UUID> 
 
 	Optional<UserSession> findByUsuarioIdAndSistemaIdAndDeviceIdAndRevokedAtIsNull(UUID usuarioId, UUID sistemaId, UUID deviceId);
 
+	Optional<UserSession> findTopByUsuarioIdAndSistemaIdAndDeviceIdOrderByUpdatedAtDesc(UUID usuarioId, UUID sistemaId, UUID deviceId);
+
 	boolean existsByUsuarioIdAndSistemaIdAndRevokedAtIsNull(UUID usuarioId, UUID sistemaId);
 
 	boolean existsByUsuarioIdAndSistemaIdAndIpAndRevokedAtIsNull(UUID usuarioId, UUID sistemaId, String ip);
