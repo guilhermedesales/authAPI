@@ -9,6 +9,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 
 import java.time.Instant;
+import java.util.UUID;
 
 @Slf4j
 @Service
@@ -28,7 +29,16 @@ public class RefreshTokenService {
         Instant now = Instant.now();
         int revokedTokens = refreshTokenRepository.revokeAllByUsuarioId(usuario.getId());
         int revokedSessions = userSessionRepository.revokeAllByUsuarioId(usuario.getId(), now);
-        log.info("[AUTH] User security revoke executed - userId={} revokedTokens={} revokedSessions={}",
+        log.info("[AUTH] User security revoke all executed - userId={} revokedTokens={} revokedSessions={}",
+                usuario.getId(), revokedTokens, revokedSessions);
+    }
+
+    @Transactional(Transactional.TxType.REQUIRES_NEW)
+    public void revokeAllByUsuarioExceptOne(Usuario usuario, UUID userSession) {
+        Instant now = Instant.now();
+        int revokedTokens = refreshTokenRepository.revokeAllByUsuarioIdExceptSessionId(usuario.getId(), userSession);
+        int revokedSessions = userSessionRepository.revokeAllByUsuarioIdExceptSession(usuario.getId(), userSession, now);
+        log.info("[AUTH] User security revoke all except one executed - userId={} revokedTokens={} revokedSessions={}",
                 usuario.getId(), revokedTokens, revokedSessions);
     }
 

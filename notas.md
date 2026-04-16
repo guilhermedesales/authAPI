@@ -21,7 +21,7 @@
 >- [ ] Melhorar padronização de erros
 >- [x] Add get sessão por user com filtros de busca por location, device
 >- [x] Implementar autorização por role/permissão (RBAC)
->- [ ] Adicionar roles/permissões no JWT (authorities)
+>- [x] Adicionar roles/permissões no JWT (authorities)
 >- [x] Proteger endpoints administrativos (sistema, role, permissao, usuarioSistema)
 >- [ ] Evitar enumeração de usuário no login (resposta padrão)
 >- [ ] Implementar revogação de access token (blacklist / Redis)
@@ -37,6 +37,7 @@
 >- [ ] Melhorar logs pensando no front
 >- [ ] Implementar 2FA (Google Authenticator / TOTP)
 >- [ ] Login com Google (OAuth2)
+>- [ ] Perguntar se quer manter sessões ativas no fluxo de mudar senha
 
 ---
 
@@ -196,3 +197,13 @@
     - otp salvo em hash no banco
 
     - pega o deviceId no fluxo de esqueci senha (evita duplicar sessões de mesmo device e sistema)
+
+## 15/04/26
+
+    - endpoints para listar e atualizar user, a lista é baseado no sistema, um adm de um sistema não pode visualizar users de iutro sistema
+
+    - começo da implementação de revogar sessoes opcional no fluxo de mudar senha (não registrou valor do campo revogarSessoes na tabela de verificationCode)
+
+## 16/04/26
+
+    - revogar sessões dps de mudar a senha no fluxo de alterar senha é opcional, mas a sessão atual vinda do token é mantida

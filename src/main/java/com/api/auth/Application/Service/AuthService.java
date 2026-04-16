@@ -151,7 +151,9 @@ public class AuthService {
                 usuario,
                 TipoVerificacao.LOGIN,
                 null,
-                sistema.getId()
+                sistema.getId(),
+                null,
+                null
         );
     }
 
@@ -193,6 +195,7 @@ public class AuthService {
                     TipoVerificacao.LOGIN_STEP_UP,
                     null,
                     sistema.getId(),
+                    null,
                     requestedDeviceId,
                     context != null ? context.getIp() : null,
                     context != null ? context.getUserAgent() : null
@@ -305,14 +308,17 @@ public class AuthService {
 
         // valida se a nova senha já foi usada antes
         senhaHistoricoService.validarSenhaNaoReutilizada(usuario, dto.getNovaSenha());
-
         log.info("[AUTH] Password policy validated - userId={}", usuarioId);
+
         String novaSenhaHash = encoder.encode(dto.getNovaSenha());
         UUID challengeId = verificationCodeService.generateAndSendChallenge(
                 usuario,
                 TipoVerificacao.ALTERAR_SENHA,
                 novaSenhaHash,
+                null,
+                dto.getRevogarSessoes(),
                 null
+
         );
         log.info("[AUTH] Password change verification sent - userId={}", usuarioId);
         return challengeId;
@@ -333,7 +339,17 @@ public class AuthService {
         usuario.setSenha(verificationCode.getNovaSenhaHash());
         usuarioRepository.save(usuario);
 
-        refreshTokenService.revokeAllByUsuario(usuario);
+        if (Boolean.TRUE.equals(verificationCode.getRevogarSessoes())) {
+            UUID currentSessionId = resolveAuthenticatedSessionId();
+            UserSession currentSession = userSessionRepository.findById(currentSessionId)
+                    .orElseThrow(() -> new ValidationException(ErrorMessages.Auth.SESSAO_EXPIRADA));
+
+            if (!currentSession.getUsuario().getId().equals(usuario.getId())) {
+                throw new ValidationException(ErrorMessages.Auth.SESSAO_EXPIRADA);
+            }
+
+            refreshTokenService.revokeAllByUsuarioExceptOne(usuario, currentSessionId);
+        }
 
         log.info("[AUTH] Password change completed - userId={}", usuario.getId());
     }
@@ -460,6 +476,24 @@ public class AuthService {
             throw new ValidationException(ErrorMessages.Auth.SESSAO_EXPIRADA);
         }
         return authorizationHeader.substring(7);
+    }
+
+    private UUID resolveAuthenticatedSessionId() {
+        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+        if (authentication == null || !(authentication.getDetails() instanceof Claims claims)) {
+            throw new ValidationException(ErrorMessages.Auth.SESSAO_EXPIRADA);
+        }
+
+        String sessionIdClaim = claims.get("sessionId", String.class);
+        if (sessionIdClaim == null || sessionIdClaim.isBlank()) {
+            throw new ValidationException(ErrorMessages.Auth.SESSAO_EXPIRADA);
+        }
+
+        try {
+            return UUID.fromString(sessionIdClaim);
+        } catch (IllegalArgumentException ex) {
+            throw new ValidationException(ErrorMessages.Auth.SESSAO_EXPIRADA);
+        }
     }
 
     /////// utilitários /////////

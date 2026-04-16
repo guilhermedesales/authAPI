@@ -76,8 +76,8 @@ public class VerificationCodeService {
     }
 
     @Transactional
-    public UUID generateAndSendChallenge(Usuario usuario, TipoVerificacao tipo, String novaSenhaHash, UUID sistemaId) {
-        return generateAndSendChallenge(usuario, tipo, novaSenhaHash, sistemaId, null, null, null);
+    public UUID generateAndSendChallenge(Usuario usuario, TipoVerificacao tipo, String novaSenhaHash, UUID sistemaId, Boolean revogarSessoes, UUID deviceId) {
+        return generateAndSendChallenge(usuario, tipo, novaSenhaHash, sistemaId, revogarSessoes, deviceId, null, null);
     }
 
     @Transactional
@@ -85,6 +85,7 @@ public class VerificationCodeService {
                                          TipoVerificacao tipo,
                                          String novaSenhaHash,
                                          UUID sistemaId,
+                                         Boolean revogarSessoes,
                                          UUID deviceId,
                                          String requestIp,
                                          String requestUserAgent) {
@@ -103,6 +104,7 @@ public class VerificationCodeService {
         verificationCode.setUsed(false);
         verificationCode.setTipo(tipo);
         verificationCode.setNovaSenhaHash(novaSenhaHash);
+        verificationCode.setRevogarSessoes(revogarSessoes);
         verificationCode.setChallengeId(challengeId);
         verificationCode.setChallengeExpiryDate(Instant.now().plusMillis(challengeExpirationMs));
         verificationCode.setChallengeUsed(false);

@@ -34,7 +34,10 @@ public class VerificationCode {
     @Enumerated(EnumType.STRING)
     private TipoVerificacao tipo; // LOGIN, ALTERAR_SENHA, etc
 
-    private String novaSenhaHash; // usado apenas no fluxo de alterar senha
+    // usados no fluxo de alterar senha
+    private String novaSenhaHash;
+    @Column(nullable = true)
+    private Boolean revogarSessoes; // pode ser null
 
     // Challenge usado no fluxo de esqueci senha para separar "validar código" de "trocar senha".
     private UUID challengeId;

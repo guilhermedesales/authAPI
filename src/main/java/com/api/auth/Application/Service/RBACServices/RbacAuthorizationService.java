@@ -15,8 +15,19 @@ import java.util.UUID;
 public class RbacAuthorizationService {
 
     public boolean isGlobalAdmin() {
-        return getAuthentication().getAuthorities().stream()
-                .anyMatch(auth -> "ROLE_GLOBAL_ADMIN".equals(auth.getAuthority()));
+        return hasAuthority("ROLE_GLOBAL_ADMIN");
+    }
+
+    public boolean isAdmin() {
+        return hasAuthority("ROLE_ADMIN");
+    }
+
+    public UUID getCurrentUsuarioId() {
+        try {
+            return UUID.fromString(getAuthentication().getName());
+        } catch (IllegalArgumentException ex) {
+            throw new ForbiddenException(ErrorMessages.Auth.ACESSO_NEGADO_SISTEMA);
+        }
     }
 
     public UUID getCurrentSistemaId() {
@@ -30,7 +41,11 @@ public class RbacAuthorizationService {
             return null;
         }
 
-        return UUID.fromString(String.valueOf(sistemaId));
+        try {
+            return UUID.fromString(String.valueOf(sistemaId));
+        } catch (IllegalArgumentException ex) {
+            throw new ForbiddenException(ErrorMessages.Auth.ACESSO_NEGADO_SISTEMA);
+        }
     }
 
     public void validateCanManageSistema(UUID sistemaId) {
@@ -65,6 +80,11 @@ public class RbacAuthorizationService {
             throw new ForbiddenException(ErrorMessages.Auth.ACESSO_NEGADO_SISTEMA);
         }
         return authentication;
+    }
+
+    private boolean hasAuthority(String authority) {
+        return getAuthentication().getAuthorities().stream()
+                .anyMatch(auth -> authority.equals(auth.getAuthority()));
     }
 }
 

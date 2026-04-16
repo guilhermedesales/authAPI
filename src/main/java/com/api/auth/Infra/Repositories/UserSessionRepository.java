@@ -34,6 +34,21 @@ public interface UserSessionRepository extends JpaRepository<UserSession, UUID> 
 	""")
 	int revokeAllByUsuarioId(@Param("usuarioId") UUID usuarioId, @Param("now") Instant now);
 
+    @Modifying(clearAutomatically = true)
+    @Transactional
+    @Query("""
+        UPDATE UserSession us
+        SET us.revokedAt = :now
+        WHERE us.usuario.id = :usuarioId
+          AND us.revokedAt IS NULL
+          AND us.id <> :sessionId
+    """)
+    int revokeAllByUsuarioIdExceptSession(
+            @Param("usuarioId") UUID usuarioId,
+            @Param("sessionId") UUID sessionId,
+            @Param("now") Instant now
+    );
+
 	Optional<UserSession> findByUsuarioIdAndSistemaIdAndDeviceIdAndRevokedAtIsNull(UUID usuarioId, UUID sistemaId, UUID deviceId);
 
 	Optional<UserSession> findTopByUsuarioIdAndSistemaIdAndDeviceIdOrderByUpdatedAtDesc(UUID usuarioId, UUID sistemaId, UUID deviceId);
