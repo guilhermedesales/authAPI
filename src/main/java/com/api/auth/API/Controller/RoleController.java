@@ -12,6 +12,7 @@ import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.UUID;
@@ -19,6 +20,7 @@ import java.util.UUID;
 @Slf4j
 @RestController
 @RequestMapping("/role")
+@PreAuthorize("hasAnyAuthority('ROLE_ADMIN', 'ROLE_GLOBAL_ADMIN')")
 @Tag(name= "Role", description = "Gestão de perfis (roles) por sistema")
 public class RoleController {
 

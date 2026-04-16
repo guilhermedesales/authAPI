@@ -7,6 +7,8 @@ import lombok.AllArgsConstructor;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 
+import java.util.UUID;
+
 @Getter
 @NoArgsConstructor
 @AllArgsConstructor
@@ -20,5 +22,6 @@ public class EsqueciSenhaVerifyCodeDTO {
     @Schema(example = "123456")
     @NotBlank(message = "O código é obrigatório")
     private String code;
+
 }
 

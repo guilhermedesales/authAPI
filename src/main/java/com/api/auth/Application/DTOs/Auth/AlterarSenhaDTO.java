@@ -4,6 +4,8 @@ import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.constraints.NotBlank;
 import lombok.*;
 
+import java.util.UUID;
+
 @Getter
 @NoArgsConstructor @AllArgsConstructor
 public class AlterarSenhaDTO {
@@ -14,4 +16,8 @@ public class AlterarSenhaDTO {
     @Schema(example = "NovaSenha@123")
     @NotBlank(message = "A nova senha é obrigatória")
     private String novaSenha;
+
+    private Boolean revogarSessoes;
+
+    private UUID deviceId;
 }

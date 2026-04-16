@@ -3,7 +3,6 @@ package com.api.auth.Application.DTOs.Auth.Login;
 import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.constraints.Email;
 import jakarta.validation.constraints.NotBlank;
-import jakarta.validation.constraints.NotNull;
 import lombok.AllArgsConstructor;
 import lombok.Getter;
 
@@ -22,8 +21,7 @@ public class LoginDTO {
     @NotBlank(message = "A senha é obrigatória")
     private String senha;
 
-    @Schema(example = "d290f1ee-6c54-4b01-90e6-d701748f0851")
-    @NotNull(message = "O sistemaId é obrigatório")
+    @Schema(example = "d290f1ee-6c54-4b01-90e6-d701748f0851", nullable = true)
     private UUID sistemaId;
 
 }

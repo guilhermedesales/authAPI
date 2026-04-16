@@ -13,6 +13,7 @@ import com.api.auth.Application.DTOs.Auth.RequestContext;
 import com.api.auth.Application.Exceptions.NotFoundException;
 import com.api.auth.Application.Exceptions.ValidationException;
 import com.api.auth.Application.Mapper.MappingProfile;
+import com.api.auth.Application.Service.RBACServices.RbacBootstrapService;
 import com.api.auth.Application.Utils.ErrorMessages;
 import com.api.auth.Application.Utils.LogSanitizer;
 import com.api.auth.Domain.Entities.*;
@@ -27,6 +28,7 @@ import io.jsonwebtoken.Claims;
 import jakarta.transaction.Transactional;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.crypto.password.PasswordEncoder;
@@ -55,9 +57,23 @@ public class AuthService {
     private final UserSessionRepository userSessionRepository;
     private final GeoLocationService geoLocationService;
     private final LoginRiskService loginRiskService;
+    private final RbacBootstrapService rbacBootstrapService;
 
     @Autowired
-    public AuthService(UsuarioRepository usuarioRepository, JwtService jwtService, PasswordEncoder encoder, SistemaRepository sistemaRepository, UsuarioSistemaRepository usuarioSistemaRepository, MappingProfile mappingProfile, VerificationCodeService verificationCodeService, SenhaHistoricoService senhaHistoricoService, TentativasLoginService tentativasLoginService, RefreshTokenService refreshTokenService, UserSessionRepository userSessionRepository, GeoLocationService geoLocationService, LoginRiskService loginRiskService) {
+    public AuthService(UsuarioRepository usuarioRepository,
+                       JwtService jwtService,
+                       PasswordEncoder encoder,
+                       SistemaRepository sistemaRepository,
+                       UsuarioSistemaRepository usuarioSistemaRepository,
+                       MappingProfile mappingProfile,
+                       VerificationCodeService verificationCodeService,
+                       SenhaHistoricoService senhaHistoricoService,
+                       TentativasLoginService tentativasLoginService,
+                       RefreshTokenService refreshTokenService,
+                       UserSessionRepository userSessionRepository,
+                       GeoLocationService geoLocationService,
+                       LoginRiskService loginRiskService,
+                       RbacBootstrapService rbacBootstrapService) {
         this.usuarioRepository = usuarioRepository;
         this.jwtService = jwtService;
         this.sistemaRepository = sistemaRepository;
@@ -71,11 +87,14 @@ public class AuthService {
         this.userSessionRepository = userSessionRepository;
         this.geoLocationService = geoLocationService;
         this.loginRiskService = loginRiskService;
+        this.rbacBootstrapService = rbacBootstrapService;
     }
 
     public RegistrarResponseDTO registrar(RegistrarDTO dto) {
         String maskedEmail = LogSanitizer.maskEmail(dto.getEmail());
         log.info("[AUTH] Register attempt - email={}", maskedEmail);
+
+        Sistema sistema = rbacBootstrapService.resolveSystemOrDefault(dto.getSistemaId());
 
         validarSenha(dto.getSenha());
         if (usuarioRepository.existsByEmail(dto.getEmail())) {
@@ -90,6 +109,8 @@ public class AuthService {
                 .build();
 
         Usuario saved = usuarioRepository.save(usuario);
+        rbacBootstrapService.ensureGlobalAdminRole();
+        ensureUserLinkedToSystemWithDefaultRole(saved, sistema);
         log.info("[AUTH] Register success - userId={} email={}", saved.getId(), maskedEmail);
         return mappingProfile.toDTO(saved);
     }
@@ -100,8 +121,7 @@ public class AuthService {
         String maskedEmail = LogSanitizer.maskEmail(dto.getEmail());
         log.info("[AUTH] Login validation started - email={} sistemaId={}", maskedEmail, dto.getSistemaId());
 
-        Sistema sistema = sistemaRepository.findById(dto.getSistemaId())
-                .orElseThrow(() -> new NotFoundException(ErrorMessages.Recursos.SISTEMA_NAO_ENCONTRADO));
+        Sistema sistema = rbacBootstrapService.resolveSystemOrDefault(dto.getSistemaId());
 
         Usuario usuario = usuarioRepository.findByEmail(dto.getEmail())
                 .orElseThrow(() -> new NotFoundException(ErrorMessages.Recursos.USUARIO_NAO_ENCONTRADO));
@@ -114,15 +134,14 @@ public class AuthService {
             throw new ValidationException("Usuário falhou em logar muitas vezes, para continuar é necessário alterar a senha");
         }
 
-        usuarioSistemaRepository.findByUsuarioAndSistema(usuario, sistema)
-                .orElseThrow(() -> new NotFoundException(ErrorMessages.Recursos.USUARIO_NAO_ENCONTRADO_SISTEMA));
-
         if(!encoder.matches(dto.getSenha(), usuario.getSenha())) {
             log.warn("[AUTH] Login validation failed - reason=invalid_credentials email={} sistemaId={}", maskedEmail, sistema.getId());
 
             String mensagem = tentativasLoginService.registrarTentativaFalha(usuario, sistema);
             throw new ValidationException(mensagem);
         }
+
+        ensureUserLinkedToSystemWithDefaultRole(usuario, sistema);
 
         log.info("[AUTH] Login validation success - userId={} sistemaId={}", usuario.getId(), sistema.getId());
         usuario.setTentativasFalhas(0);
@@ -132,7 +151,9 @@ public class AuthService {
                 usuario,
                 TipoVerificacao.LOGIN,
                 null,
-                sistema.getId()
+                sistema.getId(),
+                null,
+                null
         );
     }
 
@@ -174,6 +195,7 @@ public class AuthService {
                     TipoVerificacao.LOGIN_STEP_UP,
                     null,
                     sistema.getId(),
+                    null,
                     requestedDeviceId,
                     context != null ? context.getIp() : null,
                     context != null ? context.getUserAgent() : null
@@ -286,14 +308,17 @@ public class AuthService {
 
         // valida se a nova senha já foi usada antes
         senhaHistoricoService.validarSenhaNaoReutilizada(usuario, dto.getNovaSenha());
-
         log.info("[AUTH] Password policy validated - userId={}", usuarioId);
+
         String novaSenhaHash = encoder.encode(dto.getNovaSenha());
         UUID challengeId = verificationCodeService.generateAndSendChallenge(
                 usuario,
                 TipoVerificacao.ALTERAR_SENHA,
                 novaSenhaHash,
+                null,
+                dto.getRevogarSessoes(),
                 null
+
         );
         log.info("[AUTH] Password change verification sent - userId={}", usuarioId);
         return challengeId;
@@ -314,7 +339,17 @@ public class AuthService {
         usuario.setSenha(verificationCode.getNovaSenhaHash());
         usuarioRepository.save(usuario);
 
-        refreshTokenService.revokeAllByUsuario(usuario);
+        if (Boolean.TRUE.equals(verificationCode.getRevogarSessoes())) {
+            UUID currentSessionId = resolveAuthenticatedSessionId();
+            UserSession currentSession = userSessionRepository.findById(currentSessionId)
+                    .orElseThrow(() -> new ValidationException(ErrorMessages.Auth.SESSAO_EXPIRADA));
+
+            if (!currentSession.getUsuario().getId().equals(usuario.getId())) {
+                throw new ValidationException(ErrorMessages.Auth.SESSAO_EXPIRADA);
+            }
+
+            refreshTokenService.revokeAllByUsuarioExceptOne(usuario, currentSessionId);
+        }
 
         log.info("[AUTH] Password change completed - userId={}", usuario.getId());
     }
@@ -350,7 +385,7 @@ public class AuthService {
             throw new ValidationException("Nova senha e confirmação não conferem.");
         }
 
-        validarSenha(dto.getNovaSenha());
+        validarSenha(dto.getNovaSenha()); // senha forte
 
         VerificationCode verificationCode = verificationCodeService.validateForgotPasswordChallenge(dto.getChallengeId());
         Usuario usuario = verificationCode.getUsuario();
@@ -384,7 +419,14 @@ public class AuthService {
                 resolvedLocation
         );
 
-        UserSession session = createSession(usuario, sistema, context, requestedDeviceId, resolvedLocation, riskAssessment);
+        UserSession session = resolveOrCreateSessionForForgotPassword(
+                usuario,
+                sistema,
+                requestedDeviceId,
+                context,
+                resolvedLocation,
+                riskAssessment
+        );
         String accessToken = jwtService.generateToken(usuarioSistema, session);
         String refreshToken = jwtService.createRefreshToken(usuario, session);
 
@@ -434,6 +476,24 @@ public class AuthService {
             throw new ValidationException(ErrorMessages.Auth.SESSAO_EXPIRADA);
         }
         return authorizationHeader.substring(7);
+    }
+
+    private UUID resolveAuthenticatedSessionId() {
+        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+        if (authentication == null || !(authentication.getDetails() instanceof Claims claims)) {
+            throw new ValidationException(ErrorMessages.Auth.SESSAO_EXPIRADA);
+        }
+
+        String sessionIdClaim = claims.get("sessionId", String.class);
+        if (sessionIdClaim == null || sessionIdClaim.isBlank()) {
+            throw new ValidationException(ErrorMessages.Auth.SESSAO_EXPIRADA);
+        }
+
+        try {
+            return UUID.fromString(sessionIdClaim);
+        } catch (IllegalArgumentException ex) {
+            throw new ValidationException(ErrorMessages.Auth.SESSAO_EXPIRADA);
+        }
     }
 
     /////// utilitários /////////
@@ -492,6 +552,34 @@ public class AuthService {
         return createSession(usuario, sistema, context, deviceId, resolvedLocation, riskAssessment);
     }
 
+    private UserSession resolveOrCreateSessionForForgotPassword(Usuario usuario,
+                                                                Sistema sistema,
+                                                                UUID deviceId,
+                                                                RequestContext context,
+                                                                String resolvedLocation,
+                                                                LoginRiskService.RiskAssessment riskAssessment) {
+        if (deviceId != null) {
+            UserSession existingActiveSession = userSessionRepository
+                    .findByUsuarioIdAndSistemaIdAndDeviceIdAndRevokedAtIsNull(usuario.getId(), sistema.getId(), deviceId)
+                    .orElse(null);
+
+            if (existingActiveSession != null) {
+                return updateSessionContext(existingActiveSession, context, resolvedLocation, riskAssessment);
+            }
+
+            UserSession existingSession = userSessionRepository
+                    .findTopByUsuarioIdAndSistemaIdAndDeviceIdOrderByUpdatedAtDesc(usuario.getId(), sistema.getId(), deviceId)
+                    .orElse(null);
+
+            if (existingSession != null) {
+                existingSession.setRevokedAt(null);
+                return updateSessionContext(existingSession, context, resolvedLocation, riskAssessment);
+            }
+        }
+
+        return createSession(usuario, sistema, context, deviceId, resolvedLocation, riskAssessment);
+    }
+
     private UserSession createSession(Usuario usuario,
                                       Sistema sistema,
                                       RequestContext context,
@@ -524,5 +612,28 @@ public class AuthService {
         session.setRiskSignals(loginRiskService.serializeSignals(riskAssessment.signals()));
         session.setLastUsedAt(Instant.now());
         return userSessionRepository.save(session);
+    }
+
+    private UsuarioSistema ensureUserLinkedToSystemWithDefaultRole(Usuario usuario, Sistema sistema) {
+        return usuarioSistemaRepository.findByUsuarioAndSistema(usuario, sistema)
+                .orElseGet(() -> {
+                    rbacBootstrapService.ensureGlobalAdminRole();
+                    Role userRole = rbacBootstrapService.getOrCreateUserRole(sistema);
+
+                    UsuarioSistema novoVinculo = UsuarioSistema.builder()
+                            .usuario(usuario)
+                            .sistema(sistema)
+                            .role(userRole)
+                            .build();
+
+                    try {
+                        log.info("[AUTH] Auto-link user to system with default USER role - userId={} sistemaId={}",
+                                usuario.getId(), sistema.getId());
+                        return usuarioSistemaRepository.save(novoVinculo);
+                    } catch (DataIntegrityViolationException ex) {
+                        return usuarioSistemaRepository.findByUsuarioAndSistema(usuario, sistema)
+                                .orElseThrow(() -> ex);
+                    }
+                });
     }
 }

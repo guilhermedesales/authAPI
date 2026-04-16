@@ -20,13 +20,13 @@
 >- [x] rate limit por ip para login, esqueci senha, etc
 >- [ ] Melhorar padronização de erros
 >- [x] Add get sessão por user com filtros de busca por location, device
->- [ ] Implementar autorização por role/permissão (RBAC)
->- [ ] Adicionar roles/permissões no JWT (authorities)
->- [ ] Proteger endpoints administrativos (sistema, role, permissao, usuarioSistema)
+>- [x] Implementar autorização por role/permissão (RBAC)
+>- [x] Adicionar roles/permissões no JWT (authorities)
+>- [x] Proteger endpoints administrativos (sistema, role, permissao, usuarioSistema)
 >- [ ] Evitar enumeração de usuário no login (resposta padrão)
 >- [ ] Implementar revogação de access token (blacklist / Redis)
 >- [ ] Resolver race condition no refresh token
->- [ ] Hash do OTP (não salvar código em texto puro)
+>- [x] Hash do OTP (não salvar código em texto puro)
 >- [ ] Melhorar rate limit (não só IP, incluir email/user/device)
 >- [ ] Limitar quantidade de sessões por usuário
 >- [ ] Criar auditoria de segurança (login, refresh, senha, logout)
@@ -37,6 +37,7 @@
 >- [ ] Melhorar logs pensando no front
 >- [ ] Implementar 2FA (Google Authenticator / TOTP)
 >- [ ] Login com Google (OAuth2)
+>- [ ] Perguntar se quer manter sessões ativas no fluxo de mudar senha
 
 ---
 
@@ -48,12 +49,12 @@
 - [x] bloqueio por tentativas de login
 - [x] detectar uso de refresh inválido (revogar sessões)
 - [ ] rate limit por ip para login, esqueci senha, etc
-- [ ] autorização por role/permissão (RBAC)
-- [ ] roles/permissões no JWT (authorities)
-- [ ] proteção de endpoints administrativos
+- [x] autorização por role/permissão (RBAC)
+- [x] roles/permissões no JWT (authorities)
+- [x] proteção de endpoints administrativos
 - [ ] evitar enumeração de usuário no login
 - [ ] revogação de access token
-- [ ] hash de OTP
+- [x] hash de OTP
 - [ ] auditoria de segurança
 
 ### 🔑 Senha
@@ -82,9 +83,6 @@
 
 ## ⚠️ Problemas Atuais
 
-    - JWT sem authorities (sem autorização real)
-    - Endpoints administrativos sem proteção
-    - OTP salvo em texto puro
     - Race condition no refresh token
     - Falta revogação de access token
     - Enumeração de usuário no login
@@ -164,4 +162,48 @@
 
     - add documentação no swagger
 
+## 09/04/26
+
+    - implementação completa de RBAC (multi-tenant)
+
+    - introdução de GLOBAL_ADMIN (escopo global sem sistema)
+
+    - bootstrap automático de roles por sistema (USER, ADMIN)
+
+    - criação de sistema default para resolver problema de bootstrap
     
+    - auto-provisionamento de vínculo UsuarioSistema (register + first login)
+    
+    - proteção de endpoints via @PreAuthorize (Spring Method Security)
+
+    - enforcement de escopo por sistema (RBACAuthorizationService)
+
+    - inclusão de authorities no JWT + parsing no JwtAuthFilter
+
+    - fallback de sistema (resolveSystemOrDefault)
+
+    - inicialização de RBAC no startup (initializer)
+
+    - ajustes de DTOs para suportar multi-tenant
+
+    - testes iniciais de bootstrap (RBAC)
+
+    - correção de encoding do projeto (UTF-8)
+
+## 10/04/26
+
+     - so usa o sistema default se não tiver nenhum outro sistema registrado
+
+    - otp salvo em hash no banco
+
+    - pega o deviceId no fluxo de esqueci senha (evita duplicar sessões de mesmo device e sistema)
+
+## 15/04/26
+
+    - endpoints para listar e atualizar user, a lista é baseado no sistema, um adm de um sistema não pode visualizar users de iutro sistema
+
+    - começo da implementação de revogar sessoes opcional no fluxo de mudar senha (não registrou valor do campo revogarSessoes na tabela de verificationCode)
+
+## 16/04/26
+
+    - revogar sessões dps de mudar a senha no fluxo de alterar senha é opcional, mas a sessão atual vinda do token é mantida

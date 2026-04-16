@@ -178,7 +178,7 @@ public class AuthController {
     })
     public ResponseEntity<OtpChallengeResponseDTO> alterarSenha(@RequestBody @Valid AlterarSenhaDTO dto,
                                                                 @Parameter(description = "ID do usuário autenticado extraído do token JWT", hidden = true)
-                                                                @AuthenticationPrincipal String usuarioId) {
+                                                                 @AuthenticationPrincipal String usuarioId) {
         log.info("[AUTH] Alteracao de senha iniciada - usuarioId={}", usuarioId);
         UUID challengeId = authService.alterarSenha(UUID.fromString(usuarioId), dto);
         log.info("[AUTH] Alteracao de senha - challenge enviado - usuarioId={}", usuarioId);
@@ -261,7 +261,9 @@ public class AuthController {
             @ApiResponse(responseCode = "500", description = "Erro interno")
     })
     public ResponseEntity<LoginResponseDTO> confirmarRecuperacaoSenha(@RequestBody @Valid EsqueciSenhaConfirmDTO dto, HttpServletRequest request) {
-        LoginResponseDTO response = authService.confirmarEsqueciSenha(dto, buildRequestContext(request));
+        RequestContext contexto = buildRequestContext(request);
+        contexto.setDeviceId(dto.getDeviceId());
+        LoginResponseDTO response = authService.confirmarEsqueciSenha(dto, contexto);
         return ResponseEntity.ok(response);
     }
 
