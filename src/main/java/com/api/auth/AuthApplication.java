@@ -11,7 +11,18 @@ public class AuthApplication {
 
 	public static void main(String[] args) {
 
-        Dotenv dotenv = Dotenv.load(); // carrega .env
+        Dotenv dotenv = Dotenv.configure()
+                .ignoreIfMissing()
+                .load();
+
+        setIfPresent("POSTGRES_HOST", dotenv.get("POSTGRES_HOST"));
+        setIfPresent("POSTGRES_PORT", dotenv.get("POSTGRES_PORT"));
+        setIfPresent("POSTGRES_DB", dotenv.get("POSTGRES_DB"));
+        setIfPresent("POSTGRES_USER", dotenv.get("POSTGRES_USER"));
+        setIfPresent("POSTGRES_PASSWORD", dotenv.get("POSTGRES_PASSWORD"));
+        setIfPresent("REDIS_HOST", dotenv.get("REDIS_HOST"));
+        setIfPresent("REDIS_PORT", dotenv.get("REDIS_PORT"));
+
         setIfPresent("JWT_SECRET", dotenv.get("JWT_SECRET"));
         setIfPresent("JWT_EXPIRATION", dotenv.get("JWT_EXPIRATION"));
         setIfPresent("JWT_REFRESH_EXPIRATION", dotenv.get("JWT_REFRESH_EXPIRATION"));
