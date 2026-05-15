@@ -26,7 +26,14 @@ public class Usuario extends BaseEntity {
     @Builder.Default
     private boolean emailConfirmado = false;
 
+    @Builder.Default
+    private boolean globalAdmin = false;
+
+    @Builder.Default
     private boolean bloqueado = false;
+
+    @Builder.Default
     private int tentativasFalhas = 0;
+
     private LocalDateTime bloqueadoAte;
 }

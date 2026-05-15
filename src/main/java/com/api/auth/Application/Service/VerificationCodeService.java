@@ -13,10 +13,12 @@ import jakarta.transaction.Transactional;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 
 import java.security.SecureRandom;
 import java.time.Instant;
+import java.util.List;
 import java.util.UUID;
 
 @Slf4j
@@ -27,12 +29,16 @@ public class VerificationCodeService {
     private final VerificationCodeRepository verificationCodeRepository;
     private final EmailService emailService;
     private final UsuarioRepository usuarioRepository;
+    private final PasswordEncoder encoder;
 
     @Value("${VERIFICATION_CODE_EXPIRATION}")
     private long expirationMs;
 
     @Value("${VERIFICATION_CHALLENGE_EXPIRATION:600000}")
     private long challengeExpirationMs;
+
+    @Value("${auth.otp.max-attempts:5}")
+    private int otpMaxAttempts;
 
     @Transactional
     public void generateAndSend(Usuario usuario, TipoVerificacao tipo) {
@@ -49,7 +55,7 @@ public class VerificationCodeService {
 
         VerificationCode verificationCode = new VerificationCode();
         verificationCode.setUsuario(usuario);
-        verificationCode.setCode(code);
+        verificationCode.setCode(encoder.encode(code));
         verificationCode.setExpiryDate(Instant.now().plusMillis(expirationMs));
         verificationCode.setUsed(false);
         verificationCode.setTipo(tipo);
@@ -57,6 +63,11 @@ public class VerificationCodeService {
         verificationCode.setChallengeId(null);
         verificationCode.setChallengeExpiryDate(null);
         verificationCode.setChallengeUsed(false);
+        verificationCode.setSistemaId(null);
+        verificationCode.setDeviceId(null);
+        verificationCode.setRequestIp(null);
+        verificationCode.setRequestUserAgent(null);
+        verificationCode.setAttempts(0);
 
         verificationCodeRepository.save(verificationCode);
         emailService.sendVerificationCode(usuario.getEmail(), code);
@@ -65,10 +76,101 @@ public class VerificationCodeService {
     }
 
     @Transactional
+    public UUID generateAndSendChallenge(Usuario usuario, TipoVerificacao tipo, String novaSenhaHash, UUID sistemaId, Boolean revogarSessoes, UUID deviceId) {
+        return generateAndSendChallenge(usuario, tipo, novaSenhaHash, sistemaId, revogarSessoes, deviceId, null, null);
+    }
+
+    @Transactional
+    public UUID generateAndSendChallenge(Usuario usuario,
+                                         TipoVerificacao tipo,
+                                         String novaSenhaHash,
+                                         UUID sistemaId,
+                                         Boolean revogarSessoes,
+                                         UUID deviceId,
+                                         String requestIp,
+                                         String requestUserAgent) {
+        log.info("[AUTH] Generating challenge-based verification code - userId={} tipo={} sistemaId={}",
+                usuario.getId(), tipo, sistemaId);
+        verificationCodeRepository.deleteByUsuarioAndTipo(usuario, tipo);
+        verificationCodeRepository.flush();
+
+        String code = String.format("%06d", new SecureRandom().nextInt(999999));
+        UUID challengeId = UUID.randomUUID();
+
+        VerificationCode verificationCode = new VerificationCode();
+        verificationCode.setUsuario(usuario);
+        verificationCode.setCode(encoder.encode(code));
+        verificationCode.setExpiryDate(Instant.now().plusMillis(expirationMs));
+        verificationCode.setUsed(false);
+        verificationCode.setTipo(tipo);
+        verificationCode.setNovaSenhaHash(novaSenhaHash);
+        verificationCode.setRevogarSessoes(revogarSessoes);
+        verificationCode.setChallengeId(challengeId);
+        verificationCode.setChallengeExpiryDate(Instant.now().plusMillis(challengeExpirationMs));
+        verificationCode.setChallengeUsed(false);
+        verificationCode.setSistemaId(sistemaId);
+        verificationCode.setDeviceId(deviceId);
+        verificationCode.setRequestIp(requestIp);
+        verificationCode.setRequestUserAgent(requestUserAgent);
+        verificationCode.setAttempts(0);
+
+        verificationCodeRepository.save(verificationCode);
+        emailService.sendVerificationCode(usuario.getEmail(), code);
+        log.info("[AUTH] Challenge verification code generated and sent - userId={} challengeId={} tipo={}",
+                usuario.getId(), challengeId, tipo);
+        return challengeId;
+    }
+
+    @Transactional
+    public VerificationCode validateCodeByChallenge(UUID challengeId, String code, TipoVerificacao tipoEsperado) {
+        log.info("[AUTH] Validating challenge-based verification code - tipo={} challengeId={}",
+                tipoEsperado, challengeId);
+
+        VerificationCode verificationCode = verificationCodeRepository
+                .findByChallengeIdAndTipo(challengeId, tipoEsperado)
+                .orElseThrow(() -> new NotFoundException(ErrorMessages.CodigoEmail.CODIGO_INVALIDO));
+
+        if (verificationCode.isUsed() || verificationCode.isChallengeUsed()) {
+            throw new ValidationException(ErrorMessages.CodigoEmail.CODIGO_UTILIZADO);
+        }
+
+        if (verificationCode.getExpiryDate().isBefore(Instant.now()) ||
+                verificationCode.getChallengeExpiryDate() == null ||
+                verificationCode.getChallengeExpiryDate().isBefore(Instant.now())) {
+            throw new ValidationException(ErrorMessages.CodigoEmail.CODIGO_EXPIRADO);
+        }
+
+        if (!isOtpCodeMatch(code, verificationCode.getCode())) {
+            registerFailedAttempt(verificationCode, true);
+            throw new ValidationException(ErrorMessages.CodigoEmail.CODIGO_INVALIDO);
+        }
+
+        verificationCode.setUsed(true);
+        verificationCode.setChallengeUsed(true);
+        verificationCodeRepository.save(verificationCode);
+
+        Usuario usuario = verificationCode.getUsuario();
+        if (!usuario.isEmailConfirmado()) {
+            usuario.setEmailConfirmado(true);
+            usuarioRepository.save(usuario);
+            log.info("[AUTH] Email confirmed - userId={}", usuario.getId());
+        }
+
+        return verificationCode;
+    }
+
+    @Transactional
     public VerificationCode validateCode(String code, TipoVerificacao tipoEsperado) {
         log.info("[AUTH] Validating verification code - tipo={} codeLength={}",
                 tipoEsperado, code == null ? 0 : code.length());
-        VerificationCode verificationCode = verificationCodeRepository.findByCode(code)
+
+        Instant now = Instant.now();
+        List<VerificationCode> activeCodes = verificationCodeRepository
+                .findAllByTipoAndUsedFalseAndExpiryDateAfterOrderByExpiryDateDesc(tipoEsperado, now);
+
+        VerificationCode verificationCode = activeCodes.stream()
+                .filter(candidate -> isOtpCodeMatch(code, candidate.getCode()))
+                .findFirst()
                 .orElseThrow(() -> new NotFoundException(ErrorMessages.CodigoEmail.CODIGO_INVALIDO));
 
         if (verificationCode.isUsed()) {
@@ -109,7 +211,7 @@ public class VerificationCodeService {
         log.info("[AUTH] Validating forgot-password code - email={}", maskedEmail);
 
         VerificationCode verificationCode = verificationCodeRepository
-                .findByCodeAndUsuarioEmailAndTipo(code, email, TipoVerificacao.ESQUECI_SENHA)
+                .findTopByUsuarioEmailAndTipoAndUsedFalseOrderByExpiryDateDesc(email, TipoVerificacao.ESQUECI_SENHA)
                 .orElseThrow(() -> new NotFoundException(ErrorMessages.CodigoEmail.CODIGO_INVALIDO));
 
         if (verificationCode.isUsed()) {
@@ -118,6 +220,11 @@ public class VerificationCodeService {
 
         if (verificationCode.getExpiryDate().isBefore(Instant.now())) {
             throw new ValidationException(ErrorMessages.CodigoEmail.CODIGO_EXPIRADO);
+        }
+
+        if (!isOtpCodeMatch(code, verificationCode.getCode())) {
+            registerFailedAttempt(verificationCode, false);
+            throw new ValidationException(ErrorMessages.CodigoEmail.CODIGO_INVALIDO);
         }
 
         verificationCode.setUsed(true);
@@ -153,5 +260,29 @@ public class VerificationCodeService {
         verificationCode.setChallengeUsed(true);
         verificationCodeRepository.save(verificationCode);
         return verificationCode;
+    }
+
+    private void registerFailedAttempt(VerificationCode verificationCode, boolean challengeFlow) {
+        int currentAttempts = verificationCode.getAttempts() == null ? 0 : verificationCode.getAttempts();
+        int attempts = currentAttempts + 1;
+        verificationCode.setAttempts(attempts);
+
+        if (attempts >= otpMaxAttempts) {
+            verificationCode.setUsed(true);
+            if (challengeFlow) {
+                verificationCode.setChallengeUsed(true);
+            }
+            verificationCodeRepository.save(verificationCode);
+            throw new ValidationException(ErrorMessages.CodigoEmail.CODIGO_TENTATIVAS_EXCEDIDAS);
+        }
+
+        verificationCodeRepository.save(verificationCode);
+    }
+
+    private boolean isOtpCodeMatch(String rawCode, String storedHash) {
+        if (rawCode == null || storedHash == null) {
+            return false;
+        }
+        return encoder.matches(rawCode, storedHash);
     }
 }

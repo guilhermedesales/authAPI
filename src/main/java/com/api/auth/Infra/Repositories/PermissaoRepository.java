@@ -9,4 +9,6 @@ import java.util.UUID;
 
 public interface PermissaoRepository extends JpaRepository<Permissao, UUID> {
     Page<Permissao> findAll (Pageable pageable);
+
+    Page<Permissao> findByRoleSistemaId(UUID sistemaId, Pageable pageable);
 }

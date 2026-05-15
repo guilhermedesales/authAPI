@@ -29,13 +29,26 @@ public class VerificationCode {
     @Column(nullable = false)
     private boolean used = false;
 
+    private Integer attempts = 0;
+
     @Enumerated(EnumType.STRING)
     private TipoVerificacao tipo; // LOGIN, ALTERAR_SENHA, etc
 
-    private String novaSenhaHash; // usado apenas no fluxo de alterar senha
+    // usados no fluxo de alterar senha
+    private String novaSenhaHash;
+    @Column(nullable = true)
+    private Boolean revogarSessoes; // pode ser null
 
     // Challenge usado no fluxo de esqueci senha para separar "validar código" de "trocar senha".
     private UUID challengeId;
     private Instant challengeExpiryDate;
     private boolean challengeUsed = false;
+
+    // Vincula challenge de login ao sistema solicitado para evitar ambiguidade multi-sistema.
+    private UUID sistemaId;
+
+    // Contexto do pedido para fluxos de step-up.
+    private UUID deviceId;
+    private String requestIp;
+    private String requestUserAgent;
 }

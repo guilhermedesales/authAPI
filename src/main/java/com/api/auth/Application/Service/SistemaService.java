@@ -1,11 +1,11 @@
 package com.api.auth.Application.Service;
 
-import com.api.auth.Application.DTOs.Permissao.PermissaoDTO;
 import com.api.auth.Application.DTOs.Sistema.CriarSistemaDTO;
 import com.api.auth.Application.DTOs.Sistema.SistemaDTO;
 import com.api.auth.Application.DTOs.Sistema.SistemaListDTO;
 import com.api.auth.Application.Exceptions.NotFoundException;
 import com.api.auth.Application.Mapper.MappingProfile;
+import com.api.auth.Application.Service.RBACServices.RbacBootstrapService;
 import com.api.auth.Application.Utils.ErrorMessages;
 import com.api.auth.Infra.Repositories.SistemaRepository;
 import com.api.auth.Domain.Entities.Sistema;
@@ -23,10 +23,14 @@ public class SistemaService {
 
     private final SistemaRepository sistemaRepository;
     private final MappingProfile mappingProfile;
+    private final RbacBootstrapService rbacBootstrapService;
 
-    public SistemaService(SistemaRepository sistemaRepository, MappingProfile mappingProfile) {
+    public SistemaService(SistemaRepository sistemaRepository,
+                         MappingProfile mappingProfile,
+                         RbacBootstrapService rbacBootstrapService) {
         this.sistemaRepository = sistemaRepository;
         this.mappingProfile = mappingProfile;
+        this.rbacBootstrapService = rbacBootstrapService;
     }
 
     public SistemaListDTO criar(CriarSistemaDTO dto){
@@ -37,6 +41,7 @@ public class SistemaService {
                 .descricao(dto.getDescricao())
                 .build();
         Sistema saved = sistemaRepository.save(sistema);
+        rbacBootstrapService.ensureSystemRoles(saved);
         log.info("[SISTEMA] Create success - sistemaId={}", saved.getId());
         return mappingProfile.toListDTO(saved);
     }

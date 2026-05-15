@@ -9,13 +9,15 @@ import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
+import java.time.Instant;
+import java.util.List;
 import java.util.UUID;
 import java.util.Optional;
 
 public interface VerificationCodeRepository extends JpaRepository<VerificationCode, UUID> {
-    Optional<VerificationCode> findByCode(String code);
+    List<VerificationCode> findAllByTipoAndUsedFalseAndExpiryDateAfterOrderByExpiryDateDesc(TipoVerificacao tipo, Instant now);
 
-    Optional<VerificationCode> findByCodeAndUsuarioEmailAndTipo(String code, String email, TipoVerificacao tipo);
+    Optional<VerificationCode> findTopByUsuarioEmailAndTipoAndUsedFalseOrderByExpiryDateDesc(String email, TipoVerificacao tipo);
 
     Optional<VerificationCode> findByChallengeIdAndTipo(UUID challengeId, TipoVerificacao tipo);
 

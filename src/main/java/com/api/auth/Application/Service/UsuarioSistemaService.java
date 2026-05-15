@@ -2,8 +2,10 @@ package com.api.auth.Application.Service;
 
 import com.api.auth.Application.DTOs.UsuarioSistema.CriarUsuarioSistemaDTO;
 import com.api.auth.Application.DTOs.UsuarioSistema.UsuarioSistemaDTO;
+import com.api.auth.Application.Exceptions.ForbiddenException;
 import com.api.auth.Application.Exceptions.NotFoundException;
 import com.api.auth.Application.Mapper.MappingProfile;
+import com.api.auth.Application.Service.RBACServices.RbacAuthorizationService;
 import com.api.auth.Application.Utils.ErrorMessages;
 import com.api.auth.Domain.Entities.Role;
 import com.api.auth.Domain.Entities.Sistema;
@@ -18,7 +20,6 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
 
-import java.util.List;
 import java.util.UUID;
 
 @Slf4j
@@ -30,13 +31,20 @@ public class UsuarioSistemaService {
     private final UsuarioRepository  usuarioRepository;
     private final RoleRepository roleRepository;
     private final MappingProfile mappingProfile;
+    private final RbacAuthorizationService rbacAuthorizationService;
 
-    public UsuarioSistemaService(UsuarioSistemaRepository usuarioSistemaRepository, SistemaRepository sistemaRepository, MappingProfile mappingProfile, UsuarioRepository usuarioRepository, RoleRepository roleRepository) {
+    public UsuarioSistemaService(UsuarioSistemaRepository usuarioSistemaRepository,
+                                 SistemaRepository sistemaRepository,
+                                 MappingProfile mappingProfile,
+                                 UsuarioRepository usuarioRepository,
+                                 RoleRepository roleRepository,
+                                 RbacAuthorizationService rbacAuthorizationService) {
         this.usuarioSistemaRepository = usuarioSistemaRepository;
         this.sistemaRepository = sistemaRepository;
         this.mappingProfile = mappingProfile;
         this.usuarioRepository = usuarioRepository;
         this.roleRepository = roleRepository;
+        this.rbacAuthorizationService = rbacAuthorizationService;
     }
 
     public UsuarioSistemaDTO criar(CriarUsuarioSistemaDTO dto) {
@@ -45,6 +53,7 @@ public class UsuarioSistemaService {
 
         Sistema sistema = sistemaRepository.findById(dto.getSistemaId())
                 .orElseThrow(() -> new NotFoundException(ErrorMessages.Recursos.SISTEMA_NAO_ENCONTRADO));
+        rbacAuthorizationService.validateCanManageSistema(sistema.getId());
 
         Usuario usuario = usuarioRepository.findById(dto.getUsuarioId())
                 .orElseThrow(() -> new NotFoundException(ErrorMessages.Recursos.USUARIO_NAO_ENCONTRADO));
@@ -78,6 +87,14 @@ public class UsuarioSistemaService {
         PageRequest pageable = PageRequest.of(page, size);
         Page<UsuarioSistema> lista;
 
+        if (!rbacAuthorizationService.isGlobalAdmin()) {
+            UUID currentSistemaId = rbacAuthorizationService.getCurrentSistemaId();
+            if (sistemaId != null && !currentSistemaId.equals(sistemaId)) {
+                throw new ForbiddenException(ErrorMessages.Auth.ACESSO_NEGADO_SISTEMA);
+            }
+            sistemaId = currentSistemaId;
+        }
+
         if(usuarioId != null && sistemaId != null) // filtrou por usuario e sistema
             lista = usuarioSistemaRepository.findByUsuarioIdAndSistemaId(usuarioId, sistemaId, pageable);
 
@@ -99,6 +116,7 @@ public class UsuarioSistemaService {
         log.debug("[USUARIO_SISTEMA] Find by id started - usuarioSistemaId={}", id);
         UsuarioSistema usuarioSistema = usuarioSistemaRepository.findById(id)
                 .orElseThrow(() -> new NotFoundException(ErrorMessages.Recursos.SISTEMA_NAO_ENCONTRADO));
+        rbacAuthorizationService.validateCanManageSistema(usuarioSistema.getSistema().getId());
         log.debug("[USUARIO_SISTEMA] Find by id success - usuarioSistemaId={}", usuarioSistema.getId());
         return mappingProfile.toDTO(usuarioSistema);
     }
@@ -108,6 +126,7 @@ public class UsuarioSistemaService {
 
         UsuarioSistema usuarioSistema = usuarioSistemaRepository.findById(usuarioSistemaId)
                 .orElseThrow(() -> new NotFoundException(ErrorMessages.Recursos.SISTEMA_NAO_ENCONTRADO));
+        rbacAuthorizationService.validateCanManageSistema(usuarioSistema.getSistema().getId());
 
         Role novaRole = roleRepository
                 .findByIdAndSistemaId(novaRoleId, usuarioSistema.getSistema().getId())
@@ -125,6 +144,7 @@ public class UsuarioSistemaService {
 
         UsuarioSistema usuarioSistema = usuarioSistemaRepository.findById(usuarioSistemaId)
                 .orElseThrow(() -> new NotFoundException(ErrorMessages.Recursos.SISTEMA_NAO_ENCONTRADO));
+        rbacAuthorizationService.validateCanManageSistema(usuarioSistema.getSistema().getId());
 
         usuarioSistemaRepository.delete(usuarioSistema);
         log.info("[USUARIO_SISTEMA] Remove success - usuarioSistemaId={}", usuarioSistemaId);
