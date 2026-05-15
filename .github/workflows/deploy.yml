@@ -72,6 +72,9 @@ jobs:
           oauth-secret: ${{ secrets.TAILSCALE_OAUTH_SECRET }}
           tags: tag:ci
 
+      - name: Aguarda Tailscale
+        run: sleep 5
+
       - name: Copia compose pro servidor
         uses: appleboy/scp-action@v0.1.7
         with:
