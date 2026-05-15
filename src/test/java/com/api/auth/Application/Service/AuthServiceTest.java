@@ -143,7 +143,7 @@ class AuthServiceTest {
         when(verificationCodeService.validateForgotPasswordChallenge(challengeId)).thenReturn(verificationCode);
         when(encoder.encode("NovaSenha@123")).thenReturn("newHash");
         when(sistemaRepository.findById(sistemaId)).thenReturn(Optional.of(sistema));
-        when(usuarioSistemaRepository.findByUsuarioAndSistema(usuario, sistema)).thenReturn(Optional.of(usuarioSistema));
+        when(usuarioSistemaRepository.findByUsuarioAndSistemaWithRolePermissoes(usuario, sistema)).thenReturn(Optional.of(usuarioSistema));
         when(geoLocationService.getLocation("203.0.113.8")).thenReturn("Sao Paulo, SP, BR");
         when(loginRiskService.assess(usuario, sistema, deviceId, "203.0.113.8", "Sao Paulo, SP, BR"))
                 .thenReturn(riskAssessment);

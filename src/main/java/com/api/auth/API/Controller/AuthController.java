@@ -157,7 +157,7 @@ public class AuthController {
         }
 
         UsuarioSistema vinculoUsuarioSistema = usuarioSistemaRepository
-                .findByUsuarioAndSistema(usuario, resultadoRotacao.session().getSistema())
+                .findByUsuarioAndSistemaWithRolePermissoes(usuario, resultadoRotacao.session().getSistema())
                 .orElseThrow(() -> new NotFoundException(ErrorMessages.Recursos.USUARIO_NAO_ENCONTRADO_SISTEMA));
 
         String accessToken = jwtService.generateToken(vinculoUsuarioSistema, resultadoRotacao.session());

@@ -173,7 +173,7 @@ public class AuthService {
                 .orElseThrow(() -> new NotFoundException(ErrorMessages.Recursos.SISTEMA_NAO_ENCONTRADO));
 
         UsuarioSistema usuarioSistema = usuarioSistemaRepository
-                .findByUsuarioAndSistema(usuario, sistema)
+                .findByUsuarioAndSistemaWithRolePermissoes(usuario, sistema)
                 .orElseThrow(() -> new NotFoundException(ErrorMessages.Recursos.USUARIO_NAO_ENCONTRADO_SISTEMA));
 
         UUID requestedDeviceId = dto.getDeviceId() != null
@@ -239,7 +239,7 @@ public class AuthService {
                 .orElseThrow(() -> new NotFoundException(ErrorMessages.Recursos.SISTEMA_NAO_ENCONTRADO));
 
         UsuarioSistema usuarioSistema = usuarioSistemaRepository
-                .findByUsuarioAndSistema(usuario, sistema)
+                .findByUsuarioAndSistemaWithRolePermissoes(usuario, sistema)
                 .orElseThrow(() -> new NotFoundException(ErrorMessages.Recursos.USUARIO_NAO_ENCONTRADO_SISTEMA));
 
         RequestContext boundContext = new RequestContext();
@@ -406,7 +406,7 @@ public class AuthService {
         Sistema sistema = sistemaRepository.findById(dto.getSistemaId())
                 .orElseThrow(() -> new NotFoundException(ErrorMessages.Recursos.SISTEMA_NAO_ENCONTRADO));
 
-        UsuarioSistema usuarioSistema = usuarioSistemaRepository.findByUsuarioAndSistema(usuario, sistema)
+        UsuarioSistema usuarioSistema = usuarioSistemaRepository.findByUsuarioAndSistemaWithRolePermissoes(usuario, sistema)
                 .orElseThrow(() -> new NotFoundException(ErrorMessages.Recursos.USUARIO_NAO_ENCONTRADO_SISTEMA));
 
         UUID requestedDeviceId = context != null ? context.getDeviceId() : null;

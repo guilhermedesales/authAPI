@@ -4,6 +4,7 @@ import com.api.auth.Application.Exceptions.ValidationException;
 import com.api.auth.Application.Utils.ErrorMessages;
 import com.api.auth.Application.Utils.RoleNames;
 import com.api.auth.Domain.Entities.RefreshToken;
+import com.api.auth.Domain.Entities.Permissao;
 import com.api.auth.Domain.Entities.UserSession;
 import com.api.auth.Domain.Entities.Usuario;
 import com.api.auth.Domain.Entities.UsuarioSistema;
@@ -19,8 +20,10 @@ import org.springframework.stereotype.Service;
 import java.security.Key;
 import java.time.Instant;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.Date;
 import java.util.List;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -66,6 +69,13 @@ public class JwtService {
             authorities.add(RoleNames.toAuthority(RoleNames.GLOBAL_ADMIN));
         }
 
+        List<String> permissions = Optional.ofNullable(usuarioSistema.getRole().getPermissoes())
+                .orElse(Collections.emptyList())
+                .stream()
+                .map(Permissao::getNome)
+                .filter(Objects::nonNull)
+                .toList();
+
         JwtBuilder builder = Jwts.builder()
 
                 .setSubject(usuario.getId().toString()) // id do user
@@ -78,6 +88,7 @@ public class JwtService {
 
                 .claim("roleId", usuarioSistema.getRole().getId()) // id da role
                 .claim("roleNome", usuarioSistema.getRole().getNome()) // nome da role
+                .claim("permissions", permissions)
 
                 .setIssuedAt(new Date())
                 .setExpiration(new Date(System.currentTimeMillis() + expiration));
